@@ -32,7 +32,7 @@ class Parser:
     def get_path(self, filename):
         """
         :param str filename: name of an image file in the data folder.
-        :return str: full path to the image file (to be used as input to imshow method) assuming file exists.
+        :return str: full path to the image file (to be used as input to image show method) assuming file exists.
         """
         return f"{self._data_dir}/{filename}"
 
@@ -71,7 +71,7 @@ class Dataset(tf.keras.utils.Sequence):
     # Output cells shape without channels (height, width).
     CELLS_SHAPE = (6, 6)
 
-    def __init__(self, batch_size=64, dataset="train", shuffle=False, yield_y=True, type=2):
+    def __init__(self, batch_size=64, dataset="train", shuffle=False, yield_y=True, output_type=2):
         """
         Load dataset annotations and save batch size and configuration flags.
 
@@ -79,13 +79,13 @@ class Dataset(tf.keras.utils.Sequence):
         :param str dataset: the dataset to load (either "train" or "validation").
         :param bool shuffle: if True shuffle images after each epoch.
         :param bool yield_y: if True generate only x without y (e.g., for predicting on x).
-        :param int type: y output to generate for each cell - 0 (detected y/n), 1 (y/n + x & y shift), 2 (y/n + box).
+        :param int output_type: y output for each cell - 0 (detected y/n), 1 (y/n + x & y shift), 2 (y/n + box).
         """
         self.batch_size = batch_size
         self._parser = Parser(dataset=dataset)
         self.shuffle = shuffle
         self.yield_y = yield_y
-        self.type = type
+        self.type = output_type
 
     def __len__(self):
         """:return int: the number of batches in the dataset (per epoch)."""
@@ -149,6 +149,7 @@ class Dataset(tf.keras.utils.Sequence):
     def on_epoch_end(self):
         """Shuffle dataset on epoch end if shuffle flag is True."""
         if self.shuffle:
+            # TODO create a self.indices proxy so that shuffling is not done directly in _parse.info.
             random.shuffle(self._parser.info)
 
     @staticmethod
@@ -343,10 +344,9 @@ class Dataset(tf.keras.utils.Sequence):
 
 if __name__ == "__main__":
     """Run a few quick tests for the dataset generator."""
-    dataset = "validation"
-    ds = Dataset(dataset=dataset)
+    ds = Dataset(dataset="validation")
     ds.test(batch_index=1)
     ds.show(resize=False)  # Press 'q' to quit displaying images.
-    print(f"Number of batches in dataset {dataset}: {len(ds)}")
+    print(f"Number of batches in validation dataset: {len(ds)}")
     for batch_number, (x, y) in enumerate(ds):
         print(f"batch {batch_number}: x.shape={x.shape}, y.shape={y.shape}")
