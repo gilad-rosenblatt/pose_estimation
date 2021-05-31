@@ -135,7 +135,7 @@ class Dataset(tf.keras.utils.Sequence):
 
         # Limit y for type 0 (detected box in cell y/n) and 1 (+ 0-1 x, y shift from cell's left-upper corner) outputs.
         if self.type == 0:
-            y = y[:, :, :, 0].astype(int)
+            y = y[:, :, :, 0]
         if self.type == 1:
             y = y[:, :, :, :3]
 
