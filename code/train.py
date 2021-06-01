@@ -6,7 +6,6 @@ from loss import WeightedMSE
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
-# TODO define first on a small dataset and see overfit (changes in Dataset needed).
 # TODO how to evaluate the model?! Define custom metric?
 # TODO create a README file per saved model with hyperparameters and make folder per model in models.
 
@@ -14,15 +13,15 @@ from tensorflow.python.keras.callbacks import TensorBoard
 def main():
     # Load dataset generators.
     batch_size = 64
-    ds_train = Dataset(batch_size=batch_size, dataset="validation", output_type=0)
+    ds_train = Dataset(batch_size=batch_size, dataset="train", output_type=0)
     ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=0)
 
     # Get Model.
-    model = get_model(out_channels=1)
+    model = get_model()
     model.summary()
 
     # Define optimizer.
-    learning_rate = 0.001
+    learning_rate = 0.0001
     optimizer = tf.keras.optimizers.Adam(
         learning_rate=learning_rate
     )
@@ -45,7 +44,7 @@ def main():
         filepath="../training/cp-{epoch:03d}-{val_loss:.2f}.ckpt",
         verbose=1,
         save_weights_only=True,
-        save_best_only=True  # Latest checkpoint should be best since it is reloaded at the end.
+        save_best_only=True  # Latest checkpoint should be best.
     )
     reduce_learning_rate = tf.keras.callbacks.ReduceLROnPlateau(
         monitor="val_loss",
@@ -57,7 +56,7 @@ def main():
     callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
 
     # Train the model w/callbacks.
-    epochs = 1
+    epochs = 10
     model.fit(
         x=ds_train,
         validation_data=ds_validation,
@@ -65,7 +64,7 @@ def main():
         callbacks=callbacks
     )
 
-    # Save the model from the best checkpoint.
+    # Save the model.
     model_path = "../models/my_model"
     model.save(
         f"{model_path}_"

@@ -32,7 +32,6 @@ class WeightedMSE(tf.keras.losses.Loss):
         """
         weights = tf.where(y_true == 1, self.weight_object, self.weight_no_object)
         return tf.reduce_mean(tf.multiply(weights, tf.square(tf.subtract(y_true, y_pred))))
-        # return tf.reduce_mean(tf.square(tf.subtract(y_true, y_pred)))
 
 
 def main():
