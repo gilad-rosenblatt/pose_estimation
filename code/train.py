@@ -1,7 +1,9 @@
 import tensorflow as tf
+from time import time
 from dataset import Dataset
 from model import get_model
 from loss import WeightedMSE
+from tensorflow.python.keras.callbacks import TensorBoard
 
 
 # TODO define first on a small dataset and see overfit (changes in Dataset needed).
@@ -38,12 +40,38 @@ def main():
         metrics=["mse", "acc"]
     )
 
+    # Create callback to save model weights every epoch and reduce learning rate on plateau.
+    save_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        filepath="../training/cp-{epoch:03d}-{val_loss:.2f}.ckpt",
+        verbose=1,
+        save_weights_only=True,
+        save_best_only=True  # Latest checkpoint should be best since it is reloaded at the end.
+    )
+    reduce_learning_rate = tf.keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss",
+        factor=0.2,
+        patience=5,
+        min_lr=learning_rate / 100
+    )
+    tensorboard = TensorBoard(f"../logs/{time()}")
+    callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
+
     # Train the model w/callbacks.
-    epochs = 2
+    epochs = 1
     model.fit(
         x=ds_train,
         validation_data=ds_validation,
-        epochs=epochs
+        epochs=epochs,
+        callbacks=callbacks
+    )
+
+    # Save the model from the best checkpoint.
+    model_path = "../models/my_model"
+    model.save(
+        f"{model_path}_"
+        f"tim{time()}_"
+        f"bsz{batch_size}_"
+        f"epo{epochs}"
     )
 
 
