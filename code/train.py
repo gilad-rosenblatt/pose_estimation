@@ -2,7 +2,7 @@ import tensorflow as tf
 from time import time
 from dataset import Dataset
 from model import get_model
-from loss import WeightedMSE
+from loss import WeightedMSE, DetectionLoss, ScaledDetectionLoss
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
@@ -13,8 +13,8 @@ from tensorflow.python.keras.callbacks import TensorBoard
 def main():
     # Load dataset generators.
     batch_size = 64
-    ds_train = Dataset(batch_size=batch_size, dataset="train", output_type=0)
-    ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=0)
+    ds_train = Dataset(batch_size=batch_size, dataset="train", output_type=1)
+    ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=1)
 
     # Get Model.
     model = get_model()
@@ -27,9 +27,10 @@ def main():
     )
 
     # Define loss.
-    weighted_mse = WeightedMSE(
-        weight_object=5,
-        weight_no_object=0.5
+    weighted_mse = DetectionLoss(
+        weight_obj=5,
+        weight_noo=0.5,
+        weight_box=5
     )
 
     # Compile the model and optimizer.

@@ -1,26 +1,21 @@
-import numpy as np
 import tensorflow as tf
 from dataset import Dataset
 
 
-# TODO make dtype adaptable.
-# TODO use floats instead of numpy scalars for weight attributes.
-
-
 class WeightedMSE(tf.keras.losses.Loss):
-    """Custom MSE-based loss for object detection."""
+    """Simple MSE-based loss for object detection."""
 
-    def __init__(self, weight_no_object=0, weight_object=1, name="weighted_mse"):
+    def __init__(self, weight_noo=0.5, weight_obj=1, name="weighted_mse"):
         """
         Initialize custom loss object.
 
-        :param float weight_no_object: 0-1 weight to use for grid cells in which and object is not present.
-        :param float weight_object: 0-1 weight to use for grid cells in which and object is present.
+        :param float weight_noo: 0-1 weight to use for classification in cells in which an object is not present.
+        :param float weight_obj: 0-1 weight to use for classification in cells in which an object is present.
         :param str name: name of the loss object.
         """
         super().__init__(name=name)
-        self.weight_no_object = np.array([weight_no_object], dtype=np.float32)
-        self.weight_object = np.array([weight_object], dtype=np.float32)
+        self.weight_noo = tf.constant([weight_noo], dtype=tf.float32)
+        self.weight_obj = tf.constant([weight_obj], dtype=tf.float32)
 
     def call(self, y_true, y_pred):
         """
@@ -30,20 +25,71 @@ class WeightedMSE(tf.keras.losses.Loss):
         :param tf.Tensor y_pred: tensor of predicted values.
         :return tf.Tensor: loss value.
         """
-        weights = tf.where(y_true == 1, self.weight_object, self.weight_no_object)
-        return tf.reduce_mean(tf.multiply(weights, tf.square(tf.subtract(y_true, y_pred))))
+        weights_cls = tf.where(y_true[..., 0:1] == 1, self.weight_obj, self.weight_noo)
+        mse_cls = tf.reduce_mean(tf.multiply(weights_cls, tf.square(tf.subtract(y_true, y_pred))))
+        return mse_cls
 
 
-def main():
-    _, y = Dataset(batch_size=3, dataset="validation", output_type=0)[0]
+class DetectionLoss(WeightedMSE):
+    """Compound MSE-based loss for object detection."""
 
-    y_true = tf.convert_to_tensor(y * 1.0)
-    y_pred = tf.convert_to_tensor(y * 0.8)
+    def __init__(self, weight_box=5, *args, **kwargs):
+        """
+        Initialize custom detection loss object.
 
-    loss = WeightedMSE(weight_object=5, weight_no_object=0.5)
+        :param float weight_box: 0-1 weight to use for regression of box params in cells in which an object is present.
+        """
+        super().__init__( *args, **kwargs)
+        self.weight_box = tf.constant([weight_box], dtype=tf.float32)
 
-    print(loss.call(y_true=y_true, y_pred=y_pred))
+    def call(self, y_true, y_pred):
+        """
+        Calculate weighted mean of squared errors between true and predicted y values separately for classification
+        and regression parts.
+
+        :param tf.Tensor y_true: tensor of ground-truth values of shape (..., >1).
+        :param tf.Tensor y_pred: tensor of predicted values of shape (..., >1)..
+        :return tf.Tensor: loss value.
+        """
+        mse_cls = super().call(y_true=y_true[..., 0:1], y_pred=y_pred[..., 0:1])
+        weights_reg = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
+        mse_reg = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(y_true[..., 1:], y_pred[..., 1:]))))
+        return mse_cls + mse_reg
+
+
+class ScaledDetectionLoss(DetectionLoss):
+    """Compound and scale-resistant MSE-based loss for object detection."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize custom detection loss object."""
+        super().__init__(*args, **kwargs)
+
+    def call(self, y_true, y_pred):
+        """
+        Calculate weighted mean of squared errors between true and predicted y values separately for classification
+        and regression parts, and square the width and height dimensions to "resist" box scale changes.
+
+        :param tf.Tensor y_true: tensor of ground-truth values of shape (..., >1).
+        :param tf.Tensor y_pred: tensor of predicted values of shape (..., >1)..
+        :return tf.Tensor: loss value.
+        """
+        weights_cls = tf.where(y_true[..., 0:1] == 1, self.weight_obj, self.weight_noo)
+        weights_reg = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
+        mse_cls = tf.reduce_mean(tf.multiply(weights_cls, tf.square(tf.subtract(y_true[..., 0:1], y_pred[..., 0:1]))))
+        mse_re1 = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(
+            y_true[..., 1:3],
+            y_pred[..., 1:3]
+        ))))
+        mse_re2 = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(
+            tf.sqrt(y_true[..., 3:]),
+            tf.sqrt(y_pred[..., 3:])
+        ))))
+        return mse_cls + mse_re1 + mse_re2
 
 
 if __name__ == "__main__":
-    main()
+    _, y = Dataset(batch_size=64, dataset="validation", output_type=2)[0]
+    y_true = tf.convert_to_tensor(y * 1.0)
+    y_pred = tf.convert_to_tensor(y * 0.8)
+    loss = ScaledDetectionLoss()
+    print(loss.call(y_true=y_true, y_pred=y_pred))
