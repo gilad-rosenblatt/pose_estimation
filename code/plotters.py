@@ -4,6 +4,7 @@ from utils import BoxEncoder
 
 
 class Plotter:
+    """Plotter for images with bounding boxes."""
 
     @staticmethod
     def show(generator):
@@ -34,16 +35,20 @@ class Plotter:
 
         # Show each image along with its bounding boxes in sequence.
         window_name = "annotation_boxes"
-        for this_x, this_y in zip(x, y_true):
+        for this_x, this_y, this_pred in zip(x, y_true, y_pred):
 
-            # Load the image and instantiate a numpy array of boxes (one per row)..
+            # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
+
+            # Decode ground-truth bounding boxes and cell center points for predictions.
             boxes = encoder.decode(this_y=this_y)
+            points = encoder.decode_centers(this_y=this_pred)
 
-            # Draw bounding boxes on the image.
+            # Draw bounding boxes and circles on the image.
             Plotter._draw_boxes(image=image, boxes=boxes)
+            Plotter._draw_circles(image=image, points=points)
 
-            # Show the image with drawn bounding boxes.
+            # Show the image with drawn bounding boxes and circles.
             cv2.imshow(window_name, image)
 
             # Break the loop if key 'q' was pressed.
@@ -61,22 +66,30 @@ class Plotter:
         :param np.ndarray image: image to draw boxes on (assumed uint8 BGR image).
         :param np.ndarray boxes: boxes array sized [num_boxes, x1, y1, width, height] in image pixel units.
         """
-
-        # Create a random color scheme.
         colors = 255 * np.random.rand(32, 3)
-
-        # Draw boxes one-by-one.
-        for index, box in enumerate(boxes):
-            # Unpack box and extract corners (1: upper left, 2: lower right).
-            x1, y1, w, h = box
-            x2 = x1 + w
-            y2 = y1 + h
-
-            # Draw a bounding box onto the image.
+        for index, (x1, y1, w, h) in enumerate(boxes):
             image = cv2.rectangle(
                 image,
                 (int(x1), int(y1)),  # Upper left corner.
-                (int(x2), int(y2)),  # Lower right corner.
+                (int(x1 + w), int(y1 + h)),  # Lower right corner.
+                color=colors[index % 32, :],
+                thickness=2
+            )
+
+    @staticmethod
+    def _draw_circles(image, points):
+        """
+        Draw circles one-by-one on the image (carries side effect to image array).
+
+        :param np.ndarray image: image to draw boxes on (assumed uint8 BGR image).
+        :param np.ndarray points: points array sized [num_points, xc, yc] in image pixel units.
+        """
+        colors = 255 * np.random.rand(32, 3)
+        for index, (xc, yc) in enumerate(points):
+            image = cv2.circle(
+                image,
+                center=(int(xc), int(yc)),  # Center point.
+                radius=12,
                 color=colors[index % 32, :],
                 thickness=2
             )
