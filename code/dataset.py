@@ -63,7 +63,7 @@ class Parser:
 
 
 class Dataset(tf.keras.utils.Sequence):
-    """Generator of image batches and their ground truth outputs for training a one-step object detection model."""
+    """Generator of image batches and their ground truth bounding boxes for single-class one-step object detection."""
 
     # Input image shape without channels (height, width).
     IMAGE_SHAPE = (192, 192)
@@ -135,7 +135,7 @@ class Dataset(tf.keras.utils.Sequence):
 
         # Limit y for type 0 (detected box in cell y/n) and 1 (+ 0-1 x, y shift from cell's left-upper corner) outputs.
         if self.type == 0:
-            y = y[:, :, :, 0]
+            y = y[:, :, :, :1]
         if self.type == 1:
             y = y[:, :, :, :3]
 
