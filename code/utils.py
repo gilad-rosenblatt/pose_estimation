@@ -95,11 +95,35 @@ class BoxEncoder:
         centered_y = np.zeros(shape=(*self.cells_shape, 5), dtype=np.float32)
         centered_y[..., 0] = this_y[..., 0]
         rows, cols = np.nonzero(this_y[:, :, 0])
-        centered_y[rows, cols, 1:3] = 0.5  # Set box upper left corner to responsible cell's center (w, h = 0).
-        boxes = self.decode(this_y=centered_y)  # Return x1, y1 coordinates of decoded boxes (= xc, yc).
+        if this_y.shape[-1] < 3:
+            centered_y[rows, cols, 1:3] = 0.5  # Missing data: set box upper left corner to cell's center (w, h = 0).
+        else:
+            centered_y[rows, cols, 1:3] = this_y[rows, cols, 1:3]  # Add shift relative to upper left corner of cell.
+        boxes = self.decode(this_y=centered_y)  # Return x1, y1 coordinates of decoded zero-volume boxes (= xc, yc).
         return boxes[:, :2]
 
-    def decode_scores(self, this_y):
+    def get_cells(self, centers):
+        """
+        Get the responsible cell indices for box centers given in image pixel coordinates.
+
+        :param np.ndarray centers: a (num_points, 2) array of xc, yc box center points.
+        :return np.ndarray: a (num_points, 2) array of "responsible" cell row, column indices.
+        """
+
+        # Extract old and new image width and height.
+        from_height, from_width = self.image_shape
+        to_height, to_width = self.cells_shape
+
+        # Rescale bounding box centers [xc, yc] to gird cell units and floor to get responsible cell [row, col] indices.
+        cells = np.empty(shape=centers.shape, dtype=int)
+        cells[:, 1] = np.floor(centers[:, 0] * to_width / from_width).astype(int)  # # Column index.
+        cells[:, 0] = np.floor(centers[:, 1] * to_height / from_height).astype(int)  # Row index.
+
+        # Return cell indices.
+        return cells
+
+    @staticmethod
+    def decode_scores(this_y):
         """
         Decode the box scores from single sample y prediction output in grid cell. The y input must have zeroes in
         the first channel where boxes are not predicted or 0-scored.
@@ -121,26 +145,6 @@ class BoxEncoder:
 
         # Return array of box scores.
         return scores
-
-    def get_cells(self, centers):
-        """
-        Get the responsible cell indices for box centers given in image pixel coordinates.
-
-        :param np.ndarray centers: a (num_points, 2) array of xc, yc box center points.
-        :return np.ndarray: a (num_points, 2) array of "responsible" cell row, column indices.
-        """
-
-        # Extract old and new image width and height.
-        from_height, from_width = self.image_shape
-        to_height, to_width = self.cells_shape
-
-        # Rescale bounding box centers [xc, yc] to gird cell units and floor to get responsible cell [row, col] indices.
-        cells = np.empty(shape=centers.shape, dtype=int)
-        cells[:, 1] = np.floor(centers[:, 0] * to_width / from_width).astype(int)  # # Column index.
-        cells[:, 0] = np.floor(centers[:, 1] * to_height / from_height).astype(int)  # Row index.
-
-        # Return cell indices.
-        return cells
 
     @staticmethod
     def get_centers(boxes):

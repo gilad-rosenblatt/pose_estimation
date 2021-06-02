@@ -58,8 +58,8 @@ class Plotter:
 
             # Draw bounding boxes and circles on the image.
             Plotter._draw_boxes(image=image, boxes=boxes, colors=colors1, thickness=1)
-            Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=4, radius=4)
-            Plotter._draw_circles(image=image, points=centers, colors=colors2, thickness=2, radius=12)
+            Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=1, radius=12)
+            Plotter._draw_circles(image=image, points=centers, colors=colors2, thickness=4, radius=4)
             Plotter._draw_scores(image=image, scores=scores, points=centers, colors=colors2, thickness=1)
 
             # Show the image with drawn bounding boxes and circles.
