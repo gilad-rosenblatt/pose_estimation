@@ -25,13 +25,13 @@ class WeightedMSE(tf.keras.losses.Loss):
         :param tf.Tensor y_pred: tensor of predicted values.
         :return tf.Tensor: loss value.
         """
-        weights_cls = tf.where(y_true[..., 0:1] == 1, self.weight_obj, self.weight_noo)
-        mse_cls = tf.reduce_mean(tf.multiply(weights_cls, tf.square(tf.subtract(y_true, y_pred))))
+        weights = tf.where(y_true[..., 0:1] == 1, self.weight_obj, self.weight_noo)
+        mse_cls = tf.reduce_mean(tf.multiply(weights, tf.square(tf.subtract(y_true, y_pred))))
         return mse_cls
 
 
 class DetectionLoss(WeightedMSE):
-    """Compound MSE-based loss for object detection."""
+    """Compound MSE-based loss for object detection containing classification and regression parts."""
 
     def __init__(self, weight_box=5, *args, **kwargs):
         """
@@ -39,7 +39,7 @@ class DetectionLoss(WeightedMSE):
 
         :param float weight_box: 0-1 weight to use for regression of box params in cells in which an object is present.
         """
-        super().__init__( *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.weight_box = tf.constant([weight_box], dtype=tf.float32)
 
     def call(self, y_true, y_pred):
@@ -52,13 +52,13 @@ class DetectionLoss(WeightedMSE):
         :return tf.Tensor: loss value.
         """
         mse_cls = super().call(y_true=y_true[..., 0:1], y_pred=y_pred[..., 0:1])
-        weights_reg = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
-        mse_reg = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(y_true[..., 1:], y_pred[..., 1:]))))
+        mask = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
+        mse_reg = tf.reduce_mean(tf.multiply(mask, tf.square(tf.subtract(y_true[..., 1:], y_pred[..., 1:]))))
         return mse_cls + mse_reg
 
 
 class ScaledDetectionLoss(DetectionLoss):
-    """Compound and scale-resistant MSE-based loss for object detection."""
+    """Compound MSE-based loss for object detection containing classification and two (scaled) regression parts."""
 
     def __init__(self, *args, **kwargs):
         """Initialize custom detection loss object."""
@@ -73,18 +73,13 @@ class ScaledDetectionLoss(DetectionLoss):
         :param tf.Tensor y_pred: tensor of predicted values of shape (..., >1)..
         :return tf.Tensor: loss value.
         """
-        weights_cls = tf.where(y_true[..., 0:1] == 1, self.weight_obj, self.weight_noo)
-        weights_reg = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
-        mse_cls = tf.reduce_mean(tf.multiply(weights_cls, tf.square(tf.subtract(y_true[..., 0:1], y_pred[..., 0:1]))))
-        mse_re1 = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(
-            y_true[..., 1:3],
-            y_pred[..., 1:3]
+        mse1 = super().call(y_true=y_true[..., 0:3], y_pred=y_pred[..., 0:3])
+        mask = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
+        mse2 = tf.reduce_mean(tf.multiply(mask, tf.square(tf.subtract(
+            tf.sqrt(tf.abs(y_true[..., 3:])),
+            tf.sqrt(tf.abs(y_pred[..., 3:]))
         ))))
-        mse_re2 = tf.reduce_mean(tf.multiply(weights_reg, tf.square(tf.subtract(
-            tf.sqrt(y_true[..., 3:]),
-            tf.sqrt(y_pred[..., 3:])
-        ))))
-        return mse_cls + mse_re1 + mse_re2
+        return mse1 + mse2
 
 
 if __name__ == "__main__":

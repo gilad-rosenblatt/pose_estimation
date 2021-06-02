@@ -1,6 +1,10 @@
 from coco_anno_reader_fl import get_input_for_fl
 
 
+# TODO install COCO API.
+# TODO integrate/upgrade get_input from COCO method with COCO API.
+
+
 class Parser:
     """Parse dataset annotations and navigate data folder."""
 

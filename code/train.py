@@ -13,8 +13,8 @@ from tensorflow.python.keras.callbacks import TensorBoard
 def main():
     # Load dataset generators.
     batch_size = 64
-    ds_train = Dataset(batch_size=batch_size, dataset="train", output_type=1)
-    ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=1)
+    ds_train = Dataset(batch_size=batch_size, dataset="train", output_type=2)
+    ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=2)
 
     # Get Model.
     model = get_model()
@@ -57,7 +57,7 @@ def main():
     callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
 
     # Train the model w/callbacks.
-    epochs = 10
+    epochs = 15
     model.fit(
         x=ds_train,
         validation_data=ds_validation,

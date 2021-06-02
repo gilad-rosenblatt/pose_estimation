@@ -31,7 +31,7 @@ def get_model():
     x = tf.keras.layers.Conv2D(filters=1024, kernel_size=3, activation=tf.keras.activations.relu, padding="same")(x)
     x = tf.keras.layers.Conv2D(filters=1024, kernel_size=3, activation=tf.keras.activations.relu, padding="same")(x)
     out1 = tf.keras.layers.Conv2D(filters=1, kernel_size=3, activation=tf.keras.activations.sigmoid, padding="same")(x)
-    out2 = tf.keras.layers.Conv2D(filters=2, kernel_size=3, activation=tf.keras.activations.linear, padding="same")(x)
+    out2 = tf.keras.layers.Conv2D(filters=4, kernel_size=3, activation=tf.keras.activations.linear, padding="same")(x)
     outputs = tf.keras.layers.Concatenate()([out1, out2])
     return tf.keras.Model(inputs=inputs, outputs=outputs)
 
