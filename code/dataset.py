@@ -8,6 +8,9 @@ from encoder import BoxEncoder
 from parsers import Parser
 
 
+# TODO add data augmentation.
+
+
 class Dataset(tf.keras.utils.Sequence):
     """Generator of image batches and their ground truth bounding boxes for single-class one-step object detection."""
 
