@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import tensorflow as tf
 from plotters import Plotter
-from utils import BoxEncoder
+from encoder import BoxEncoder
 from parsers import Parser
 
 

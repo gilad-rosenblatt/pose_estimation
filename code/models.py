@@ -4,8 +4,8 @@ import tensorflow as tf
 # TODO add batch norm and dropout.
 # TODO use a better activation (leaky relu or mish).
 
-def get_model():
-    """:return tf.keras.Sequential: tensorflow fully-convolutional model."""
+def get_basic_model():
+    """:return tf.keras.Sequential: tensorflow fully-convolutional model for one-step object detection."""
     inputs = tf.keras.layers.Input(shape=(None, None, 3))
     x = tf.keras.layers.Conv2D(filters=32, kernel_size=3, activation=tf.keras.activations.relu, padding="same")(inputs)
     x = tf.keras.layers.Conv2D(filters=32, kernel_size=3, activation=tf.keras.activations.relu, padding="same")(x)
@@ -37,5 +37,5 @@ def get_model():
 
 
 if __name__ == "__main__":
-    model = get_model()
+    model = get_basic_model()
     model.summary()

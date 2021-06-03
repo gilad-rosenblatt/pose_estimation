@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from utils import BoxEncoder
+from encoder import BoxEncoder
 
 
 class Plotter:
@@ -35,6 +35,7 @@ class Plotter:
 
         _, *image_shape, _ = x.shape
         _, *cells_shape, _ = y_true.shape
+        *_, num_output_channels = y_pred.shape
         encoder = BoxEncoder(image_shape=image_shape, cells_shape=cells_shape)
 
         # Show each image along with its bounding boxes in sequence.
@@ -45,8 +46,8 @@ class Plotter:
             image = (this_x * 255).astype(np.uint8)
 
             # Decode ground-truth bounding boxes and extract cell center points for predictions and ground truth.
-            boxes = encoder.decode(this_y=this_y)
-            centers_gt = encoder.get_centers(boxes=boxes)
+            boxes_gt = encoder.decode(this_y=this_y)
+            centers_gt = encoder.get_centers(boxes=boxes_gt)
             centers = encoder.decode_centers(this_y=this_pred)
             scores = encoder.decode_scores(this_y=this_pred)
 
@@ -57,8 +58,11 @@ class Plotter:
             colors2 = [Plotter._get_color(index=index) for index in np.ravel_multi_index(cells2.T, dims=cells_shape)]
 
             # Draw bounding boxes and circles on the image.
-            Plotter._draw_boxes(image=image, boxes=boxes, colors=colors1, thickness=1)
+            Plotter._draw_boxes(image=image, boxes=boxes_gt, colors=colors1, thickness=1)
             Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=1, radius=12)
+            if num_output_channels == 5:
+                boxes = encoder.decode(this_y=this_pred)
+                Plotter._draw_boxes(image=image, boxes=boxes, colors=colors2, thickness=2)
             Plotter._draw_circles(image=image, points=centers, colors=colors2, thickness=4, radius=4)
             Plotter._draw_scores(image=image, scores=scores, points=centers, colors=colors2, thickness=1)
 

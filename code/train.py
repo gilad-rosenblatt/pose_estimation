@@ -1,7 +1,7 @@
 import tensorflow as tf
 from time import time
 from dataset import Dataset
-from model import get_model
+from models import get_basic_model
 from loss import WeightedMSE, DetectionLoss, ScaledDetectionLoss
 from tensorflow.python.keras.callbacks import TensorBoard
 
@@ -17,7 +17,7 @@ def main():
     ds_validation = Dataset(batch_size=batch_size, dataset="validation", output_type=2)
 
     # Get Model.
-    model = get_model()
+    model = get_basic_model()
     model.summary()
 
     # Define optimizer.
