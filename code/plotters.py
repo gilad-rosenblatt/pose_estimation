@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from encoder import BoxEncoder
+from boxops import NMS
 
 
 class Plotter:
@@ -61,6 +62,7 @@ class Plotter:
             Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=1, radius=12)
             if num_output_channels == 5:
                 boxes, scores = encoder.decode(this_y=this_pred)
+                boxes, scores = NMS.perform(boxes=boxes, scores=scores, threshold=0.3)
                 Plotter._draw_boxes(image=image, boxes=boxes, colors=colors2, thickness=2)
             else:
                 scores = encoder.decode_scores(this_y=this_pred)

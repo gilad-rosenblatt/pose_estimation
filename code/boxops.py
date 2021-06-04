@@ -1,6 +1,9 @@
 import numpy as np
 
 
+# TODO test NMS.
+
+
 class IOU:
     """Intersection over union between bounding boxes."""
 

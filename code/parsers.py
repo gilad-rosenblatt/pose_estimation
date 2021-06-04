@@ -1,7 +1,7 @@
 from coco_anno_reader_fl import get_input_for_fl
 
 
-# TODO install COCO API.
+# TODO Learn to use COCO API mAP evaluation.
 # TODO integrate/upgrade get_input from COCO method with COCO API.
 
 

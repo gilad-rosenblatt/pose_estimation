@@ -1,8 +1,8 @@
 import tensorflow as tf
 from time import time
 from dataset import Dataset
-from models import get_basic_model, get_model
-from loss import WeightedMSE, DetectionLoss, ScaledDetectionLoss
+from models import get_model
+from loss import DetectionLoss
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
@@ -42,7 +42,7 @@ def main():
 
     # Create callback to save model weights every epoch and reduce learning rate on plateau.
     save_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath="../training/cp-{epoch:03d}-{val_loss:.2f}.ckpt",
+        filepath="../training/cp-{epoch:03d}.ckpt",
         verbose=1,
         save_weights_only=True,
         save_best_only=True  # Latest checkpoint should be best.
