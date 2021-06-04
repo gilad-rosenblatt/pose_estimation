@@ -11,7 +11,7 @@ class TestDataset(unittest.TestCase):
         """Test that decoding encoded boxes for a batch yields the original (scaled) box annotations for that batch."""
 
         # Load dataset generator object.
-        dataset = Dataset(batch_size=64, dataset="train")
+        dataset = Dataset(batch_size=64, dataset="validation")
 
         # Select index of the batch to test.
         batch_index = 0
@@ -26,7 +26,7 @@ class TestDataset(unittest.TestCase):
         for this_y, (filename, box_list) in zip(y, batch_info):
 
             # Extract image and detection bounding boxes.
-            boxes_out = dataset._encoder.decode(this_y)
+            boxes_out, _ = dataset._encoder.decode(this_y)
 
             # Load the image and boxes and resize to model input shape.
             _, boxes_in = dataset._resize(

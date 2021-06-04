@@ -64,14 +64,15 @@ class BoxEncoder:
         they are (probabilities or confidence scores). Any non-zero value will be treated as a valid box prediction.
 
         :param np.ndarray this_y: (*CELLS_SHAPE, 5) array [detected y/n, cell-relative xc, yc, image-normalized w, h].
-        :return np.ndarray: (num_boxes, 4) boxes array where each row represents a box in the format [x1, y1, w, h].
+        :return tuple: (num_boxes, 4) boxes numpy array in [x1, y1, w, h] format and their (num_boxes, 1) scores array.
         """
 
         # Get the row and column indices of cells associated with boxes (non-zero score).
         rows, cols = np.nonzero(this_y[:, :, 0])
 
-        # Instantiate the array of boxes.
+        # Instantiate the array of boxes and scores.
         boxes = np.empty(shape=(rows.size, 4), dtype=np.float32)
+        scores = np.empty(shape=(rows.size, 1), dtype=np.float32)
 
         # Extract input and output width and height.
         input_height, input_width = self.image_shape
@@ -85,9 +86,10 @@ class BoxEncoder:
             w = this_y[row, col, 3] * input_width
             h = this_y[row, col, 4] * input_height
             boxes[index, ...] = np.array([xc - w / 2, yc - h / 2, w, h])  # Upper left corner: x,y1 = x,yc - w,h / 2.
+            scores[index, ...] = this_y[row, col, 0]
 
         # Return boxes array.
-        return boxes
+        return boxes, scores
 
     def decode_centers(self, this_y):
         """
@@ -103,7 +105,7 @@ class BoxEncoder:
             centered_y[rows, cols, 1:3] = 0.5  # Missing data: set box upper left corner to cell's center (w, h = 0).
         else:
             centered_y[rows, cols, 1:3] = this_y[rows, cols, 1:3]  # Add shift relative to upper left corner of cell.
-        boxes = self.decode(this_y=centered_y)  # Return x1, y1 coordinates of decoded zero-volume boxes (= xc, yc).
+        boxes, _ = self.decode(this_y=centered_y)  # Return x1, y1 coordinates of decoded boxes (= xc, yc).
         return boxes[:, :2]
 
     def get_cells(self, centers):

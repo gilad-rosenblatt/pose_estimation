@@ -46,10 +46,9 @@ class Plotter:
             image = (this_x * 255).astype(np.uint8)
 
             # Decode ground-truth bounding boxes and extract cell center points for predictions and ground truth.
-            boxes_gt = encoder.decode(this_y=this_y)
+            boxes_gt, _ = encoder.decode(this_y=this_y)
             centers_gt = encoder.get_centers(boxes=boxes_gt)
             centers = encoder.decode_centers(this_y=this_pred)
-            scores = encoder.decode_scores(this_y=this_pred)
 
             # Get colors for center points according to responsible cell in the output grid cells.
             cells1 = encoder.get_cells(centers=centers_gt)
@@ -61,8 +60,10 @@ class Plotter:
             Plotter._draw_boxes(image=image, boxes=boxes_gt, colors=colors1, thickness=1)
             Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=1, radius=12)
             if num_output_channels == 5:
-                boxes = encoder.decode(this_y=this_pred)
+                boxes, scores = encoder.decode(this_y=this_pred)
                 Plotter._draw_boxes(image=image, boxes=boxes, colors=colors2, thickness=2)
+            else:
+                scores = encoder.decode_scores(this_y=this_pred)
             Plotter._draw_circles(image=image, points=centers, colors=colors2, thickness=4, radius=4)
             Plotter._draw_scores(image=image, scores=scores, points=centers, colors=colors2, thickness=1)
 

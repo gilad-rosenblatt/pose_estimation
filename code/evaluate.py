@@ -14,7 +14,8 @@ def main():
     filenames = dict(
         stage_1="my_model_tim1622613991.4143317_bsz64_epo10",
         stage_2="my_model_tim1622657298.7396855_bsz64_epo10",
-        stage_3="my_model_tim1622707835.3077517_bsz64_epo15_ckp10"
+        stage_3="my_model_tim1622707835.3077517_bsz64_epo15_ckp10",
+        # stage_4="my_model_tim1622744262.2669034_bsz64_epo15_ckp08"
     )
 
     # Load models and show their predictions on the test batch (press "q" to exit).
