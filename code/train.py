@@ -17,11 +17,11 @@ def main():
     ds_validation = Dataset(batch_size=batch_size, dataset="validation")
 
     # Get Model.
-    model = get_model()
+    model = get_model(batch_normalization=True, activation="leaky_relu", dropout=True)
     model.summary()
 
     # Define optimizer.
-    learning_rate = 0.0001
+    learning_rate = 0.001
     optimizer = tf.keras.optimizers.Adam(
         learning_rate=learning_rate
     )
@@ -37,7 +37,7 @@ def main():
     model.compile(
         optimizer=optimizer,
         loss=weighted_mse,
-        metrics=["mse", "acc"]
+        metrics=["mse"]
     )
 
     # Create callback to save model weights every epoch and reduce learning rate on plateau.
