@@ -140,7 +140,6 @@ class Dataset(tf.keras.utils.Sequence):
 if __name__ == "__main__":
     """Run a few quick tests for the dataset generator."""
     ds = Dataset(dataset="validation")
-    ds.test(batch_index=1)
     ds.show(resize=False)  # Press 'q' to quit displaying images.
     print(f"Number of batches in validation dataset: {len(ds)}")
     for batch_number, (x, y) in enumerate(ds):
