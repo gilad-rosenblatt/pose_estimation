@@ -1,14 +1,10 @@
-import random
 import math
-import numpy as np
 import cv2
+import numpy as np
 import tensorflow as tf
 from plotters import Plotter
 from encoder import BoxEncoder
 from parsers import Parser
-
-
-# TODO add data augmentation.
 
 
 class Dataset(tf.keras.utils.Sequence):
@@ -20,50 +16,43 @@ class Dataset(tf.keras.utils.Sequence):
     # Output cells shape without channels (height, width).
     CELLS_SHAPE = (6, 6)
 
-    def __init__(self, batch_size=64, dataset="train", shuffle=False, yield_y=True, output_type=2):
+    def __init__(self, batch_size=64, dataset="train", shuffle=False):
         """
         Load dataset annotations and save batch size and configuration flags.
 
         :param int batch_size: number of images to include in a single batch.
         :param str dataset: the dataset to load (either "train" or "validation").
         :param bool shuffle: if True shuffle images after each epoch.
-        :param bool yield_y: if True generate only x without y (e.g., for predicting on x).
-        :param int output_type: y output for each cell - 0 (detected y/n), 1 (y/n + x & y shift), 2 (y/n + box).
         """
         self.batch_size = batch_size
-        self._parser = Parser(dataset=dataset)
         self.shuffle = shuffle
-        self.yield_y = yield_y
-        self.type = output_type
+        self._parser = Parser(dataset=dataset)
+        self._indices = np.arange(0, len(self._parser.info))
         self._encoder = BoxEncoder(image_shape=Dataset.IMAGE_SHAPE, cells_shape=Dataset.CELLS_SHAPE)
 
     def __len__(self):
-        """:return int: the number of batches in the dataset (per epoch)."""
+        """
+        :return int: the number of batches in the dataset (batches per epoch).
+        """
         return math.ceil(len(self._parser.info) / self.batch_size)
 
     def __getitem__(self, batch_index):
         """
-        Generate one batch of data corresponding to the input batch index.
+        Generate one batch of data corresponding to the input batch index. Does not raise IndexError (a tf.Sequence).
 
         :param int batch_index: index of the batch to get.
         :return tuple: x of shape [batch_size, height, width, channels] and y of shape [batch_size, *CELLS_SHAPE, 5].
-
-        NOTE: Check for last batch is done by tensorflow Sequence superclass (no need to raise IndexError).
         """
 
-        # Get file paths and box annotations for this batch.
-        batch_info = self._parser.info[batch_index * self.batch_size: (batch_index + 1) * self.batch_size]
+        # Get file paths and box annotations for this batch (using the indices proxy allows shuffling at epoch end).
+        indices = self._indices[batch_index * self.batch_size: (batch_index + 1) * self.batch_size]
+        batch_info = [self._parser.info[index] for index in indices]
 
-        # Calculate the batch size (last batch may be smaller)
-        this_batch_size = self.batch_size
-        if batch_index == self.__len__() - 1:
-            this_batch_size = len(self._parser.info) % self.batch_size
+        # Initialize input and output arrays (take batch size from indices since last batch can be smaller).
+        x = np.empty(shape=(indices.size, *Dataset.IMAGE_SHAPE, 3), dtype=np.float32)
+        y = np.empty(shape=(indices.size, *Dataset.CELLS_SHAPE, 5), dtype=np.float32)
 
-        # Initialize input and output arrays.
-        x = np.empty(shape=(this_batch_size, *Dataset.IMAGE_SHAPE, 3), dtype=np.float32)
-        y = np.empty(shape=(this_batch_size, *Dataset.CELLS_SHAPE, 5), dtype=np.float32)
-
-        # Fill input and output arrays image-by-image.
+        # Fill input and output arrays image-by-image. Does not raise IndexError (last batch check done by tf.Sequence).
         for index, (filename, box_list) in enumerate(batch_info):
 
             # Load the image and instantiate a numpy array of boxes (one per row).
@@ -76,31 +65,20 @@ class Dataset(tf.keras.utils.Sequence):
             # Normalize input image to 0-1.
             this_x = this_image / 255
 
-            # Encode boxes into an output array.
+            # Encode boxes into a cell grid output array.
             this_y = self._encoder.encode(boxes)
 
             # Append this x and y to the batch.
             x[index, ...] = this_x
             y[index, ...] = this_y
 
-        # Limit y for type 0 (detected box in cell y/n) and 1 (+ 0-1 x, y shift from cell's left-upper corner) outputs.
-        if self.type == 0:
-            y = y[:, :, :, :1]
-        if self.type == 1:
-            y = y[:, :, :, :3]
-
         # Return batch.
-        # TODO make yield_y = False mode faster by not retrieving boxes.
-        if self.yield_y:
-            return x, y
-        else:
-            return x
+        return x, y
 
     def on_epoch_end(self):
         """Shuffle dataset on epoch end if shuffle flag is True."""
         if self.shuffle:
-            # TODO create a self.indices proxy so that shuffling is not done directly in _parse.info.
-            random.shuffle(self._parser.info)
+            np.random.shuffle(self._indices)
 
     @staticmethod
     def _resize(image, boxes):
@@ -118,7 +96,7 @@ class Dataset(tf.keras.utils.Sequence):
 
     def show(self, resize=False):
         """
-        Look at the images and corresponding bounding boxes one by one (press 'q' to exit).
+        Look at the images and corresponding bounding boxes of the entire dataset one by one (press 'q' to exit).
 
         :param bool resize: if True resize images and bounding boxes to IMAGE_SHAPE (otherwise use original shape).
         """
@@ -139,7 +117,7 @@ class Dataset(tf.keras.utils.Sequence):
 
 if __name__ == "__main__":
     """Run a few quick tests for the dataset generator."""
-    ds = Dataset(dataset="validation")
+    ds = Dataset(dataset="validation", shuffle=True)
     ds.show(resize=False)  # Press 'q' to quit displaying images.
     print(f"Number of batches in validation dataset: {len(ds)}")
     for batch_number, (x, y) in enumerate(ds):
