@@ -1,10 +1,6 @@
 import numpy as np
 
 
-# TODO implement IOU.
-# TODO implement NMS.
-
-
 class BoxEncoder:
     """Encoder for bounding boxes in an image divided into grid cells."""
 
