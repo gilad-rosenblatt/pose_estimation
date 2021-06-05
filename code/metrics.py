@@ -112,7 +112,7 @@ class ModelEvaluator:
         coco_eval = COCOeval(cocoGt=coco_gt, cocoDt=coco_dt, iouType="bbox")
         coco_eval.params.imgIds = ids
         coco_eval.params.catIds = [1]
-        # coco_eval.params.areaRng = [[10000, 100000], [10000, 10001], [10001, 10002], [10002, 100000]]  # Default: 0, 32^2, 96^2
+        # coco_eval.params.areaRng = [[10000, 100000], [10000, 10001], [10001, 10002], [10002, 100000]]  # 0, 32^2, 96^2
 
         # Evaluate score and display to console.
         coco_eval.evaluate()
@@ -148,7 +148,12 @@ class ModelEvaluator:
 
 
 if __name__ == "__main__":
-    scorer = ModelEvaluator(model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01")
-    this_filename = scorer.predict_and_save(cls_threshold=0.8, nms_threshold=0.3)
+    # scorer = ModelEvaluator(model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01")
+    # this_filename = scorer.predict_and_save(cls_threshold=0.8, nms_threshold=0.3)
+    this_filename = ModelEvaluator.get_filename(
+        model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01",
+        cls_threshold=0.8,
+        nms_threshold=0.3
+    )
     stats = ModelEvaluator.score(this_filename)
     ModelEvaluator.show(this_filename)
