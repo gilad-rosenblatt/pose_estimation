@@ -1,9 +1,6 @@
 import numpy as np
 
 
-# TODO test NMS.
-
-
 class IOU:
     """Intersection over union between bounding boxes."""
 
@@ -80,15 +77,16 @@ class NMS:
         return np.compress(keep.ravel(), boxes, axis=0), np.compress(keep.ravel(), scores, axis=0)
 
 
-def main():
+if __name__ == "__main__":
+
     boxes = np.array([
-        [0.5, 0.71, 0.2, 0.2],
-        [0.5, 0.69, 0.2, 0.2],
-        [0.8, 0.11, 0.6, 0.1],
-        [0.81, 0.12, 0.63, 0.1],
-        [0.8, 0.1, 0.61, 0.1],
-        [0.8, 0.11, 0.6, 0.1],
-        [0.1, 0.55, 0.6, 0.9]
+        [0.5, 0.71, 0.20, 0.2],
+        [0.5, 0.69, 0.20, 0.2],
+        [0.8, 0.11, 0.60, 0.1],
+        [0.8, 0.12, 0.63, 0.1],
+        [0.8, 0.10, 0.61, 0.1],
+        [0.8, 0.11, 0.60, 0.1],
+        [0.1, 0.55, 0.60, 0.9]
     ])
 
     scores = np.array([
@@ -103,7 +101,3 @@ def main():
 
     for box, score in zip(*NMS.perform(boxes, scores, threshold=0.5)):
         print(box, score)
-
-
-if __name__ == "__main__":
-    main()

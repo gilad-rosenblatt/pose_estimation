@@ -1,10 +1,12 @@
 import math
+
 import cv2
 import numpy as np
 import tensorflow as tf
-from plotters import Plotter
+
 from encoder import BoxEncoder
 from parsers import Parser
+from plotters import Plotter
 
 
 class Dataset(tf.keras.utils.Sequence):

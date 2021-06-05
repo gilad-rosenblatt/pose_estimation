@@ -1,4 +1,5 @@
 import tensorflow as tf
+
 from dataset import Dataset
 
 
@@ -86,5 +87,4 @@ if __name__ == "__main__":
     _, y = Dataset(batch_size=64, dataset="validation")[0]
     y_true = tf.convert_to_tensor(y * 1.0)
     y_pred = tf.convert_to_tensor(y * 0.8)
-    loss = ScaledDetectionLoss()
-    print(loss.call(y_true=y_true, y_pred=y_pred))
+    print(ScaledDetectionLoss().call(y_true=y_true, y_pred=y_pred))

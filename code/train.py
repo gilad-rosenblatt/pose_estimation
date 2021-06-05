@@ -1,13 +1,11 @@
-import tensorflow as tf
 from time import time
-from dataset import Dataset
-from models import get_model
-from loss import DetectionLoss
+
+import tensorflow as tf
 from tensorflow.python.keras.callbacks import TensorBoard
 
-
-# TODO how to evaluate the model?! Define custom metric?
-# TODO create a README file per saved model with hyperparameters and make folder per model in models.
+from dataset import Dataset
+from loss import DetectionLoss
+from models import get_model
 
 
 def main():

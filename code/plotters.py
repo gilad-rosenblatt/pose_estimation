@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-from encoder import BoxEncoder
+
 from boxops import NMS
+from encoder import BoxEncoder
 
 
 class Plotter:
@@ -34,42 +35,40 @@ class Plotter:
     @staticmethod
     def show_batch(x, y_true, y_pred):
 
+        # Get input and output dimensions.
         _, *image_shape, _ = x.shape
         _, *cells_shape, _ = y_true.shape
         *_, num_output_channels = y_pred.shape
+
+        # Initialize encoder.
         encoder = BoxEncoder(image_shape=image_shape, cells_shape=cells_shape)
 
-        # Show each image along with its bounding boxes in sequence.
+        # Show ground-truth and predictions for each image in sequence.
         window_name = "annotation_boxes"
         for this_x, this_y, this_pred in zip(x, y_true, y_pred):
 
             # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
 
-            # Decode ground-truth bounding boxes and extract cell center points for predictions and ground truth.
-            boxes_gt, _ = encoder.decode(this_y=this_y)
-            centers_gt = encoder.get_centers(boxes=boxes_gt)
-            if num_output_channels == 5:
-                boxes, scores = encoder.decode(this_y=this_pred)
-                boxes, scores = NMS.perform(boxes=boxes, scores=scores, threshold=0.3)
-                centers = encoder.get_centers(boxes=boxes)
-            else:
-                centers = encoder.decode_centers(this_y=this_pred)
-                scores = encoder.decode_scores(this_y=this_pred)
+            # Decode bounding boxes and extract cell center points for predictions (after NMS) and ground truth.
+            boxes_true, _ = encoder.decode(this_y=this_y)
+            centers_true = encoder.get_centers(boxes=boxes_true)
+            boxes_pred, scores = encoder.decode(this_y=this_pred)
+            boxes_pred, scores = NMS.perform(boxes=boxes_pred, scores=scores, threshold=0.3)
+            centers_pred = encoder.get_centers(boxes=boxes_pred)
 
-            # Get colors for center points according to responsible cell in the output grid cells.
-            cells1 = encoder.get_cells(centers=centers_gt)
-            cells2 = encoder.get_cells(centers=centers)
+            # Get colors for boxes based on the output grid cell their center points fall in.
+            cells1 = encoder.get_cells(centers=centers_true)
+            cells2 = encoder.get_cells(centers=centers_pred)
             colors1 = [Plotter._get_color(index=index) for index in np.ravel_multi_index(cells1.T, dims=cells_shape)]
             colors2 = [Plotter._get_color(index=index) for index in np.ravel_multi_index(cells2.T, dims=cells_shape)]
 
-            # Draw bounding boxes and circles on the image.
-            Plotter._draw_boxes(image=image, boxes=boxes_gt, colors=colors1, thickness=1)
-            Plotter._draw_circles(image=image, points=centers_gt, colors=colors1, thickness=1, radius=12)
-            if num_output_channels == 5:
-                Plotter._draw_boxes(image=image, boxes=boxes, colors=colors2, thickness=2)
-            Plotter._draw_circles(image=image, points=centers, colors=colors2, thickness=4, radius=4)
-            Plotter._draw_scores(image=image, scores=scores, points=centers, colors=colors2, thickness=1)
+            # Draw bounding boxes and box center circles.
+            Plotter._draw_boxes(image=image, boxes=boxes_true, colors=colors1, thickness=1)
+            Plotter._draw_circles(image=image, points=centers_true, colors=colors1, thickness=1, radius=12)
+            Plotter._draw_boxes(image=image, boxes=boxes_pred, colors=colors2, thickness=2)
+            Plotter._draw_circles(image=image, points=centers_pred, colors=colors2, thickness=4, radius=4)
+            Plotter._draw_scores(image=image, scores=scores, points=centers_pred, colors=colors2, thickness=1)
 
             # Show the image with drawn bounding boxes and circles.
             cv2.imshow(window_name, image)
