@@ -18,16 +18,18 @@ class Dataset(tf.keras.utils.Sequence):
     # Output cells shape without channels (height, width).
     CELLS_SHAPE = (6, 6)
 
-    def __init__(self, batch_size=64, dataset="train", shuffle=False):
+    def __init__(self, batch_size=64, dataset="train", shuffle=False, generate_image_ids=False):
         """
         Load dataset annotations and save batch size and configuration flags.
 
         :param int batch_size: number of images to include in a single batch.
         :param str dataset: the dataset to load (either "train" or "validation").
         :param bool shuffle: if True shuffle images after each epoch.
+        :param generate_image_ids: if True generates image IDs (x, y, image_id) with each batch (gor scoring purposes).
         """
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.generate_image_ids = generate_image_ids
         self._parser = Parser(dataset=dataset)
         self._indices = np.arange(0, len(self._parser.info))
         self._encoder = BoxEncoder(image_shape=Dataset.IMAGE_SHAPE, cells_shape=Dataset.CELLS_SHAPE)
@@ -53,10 +55,10 @@ class Dataset(tf.keras.utils.Sequence):
         # Initialize input and output arrays (take batch size from indices since last batch can be smaller).
         x = np.empty(shape=(indices.size, *Dataset.IMAGE_SHAPE, 3), dtype=np.float32)
         y = np.empty(shape=(indices.size, *Dataset.CELLS_SHAPE, 5), dtype=np.float32)
+        ids = np.empty(shape=(indices.size,), dtype=int) if self.generate_image_ids else None
 
         # Fill input and output arrays image-by-image. Does not raise IndexError (last batch check done by tf.Sequence).
-        for index, (filename, box_list) in enumerate(batch_info):
-
+        for index, (filename, box_list, image_id) in enumerate(batch_info):
             # Load the image and instantiate a numpy array of boxes (one per row).
             this_image = cv2.imread(self._parser.get_path(filename))
             boxes = np.array(box_list, dtype=np.float32)
@@ -70,12 +72,14 @@ class Dataset(tf.keras.utils.Sequence):
             # Encode boxes into a cell grid output array.
             this_y = self._encoder.encode(boxes)
 
-            # Append this x and y to the batch.
+            # Append this x and y to the batch (and add this image ID).
             x[index, ...] = this_x
             y[index, ...] = this_y
+            if self.generate_image_ids:
+                ids[index] = image_id
 
         # Return batch.
-        return x, y
+        return (x, y) if not self.generate_image_ids else (x, y, ids)
 
     def on_epoch_end(self):
         """Shuffle dataset on epoch end if shuffle flag is True."""

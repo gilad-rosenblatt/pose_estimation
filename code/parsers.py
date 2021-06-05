@@ -5,7 +5,7 @@ from pycocotools.coco import COCO
 
 
 class Parser:
-    """Parse dataset annotations and navigate data folder."""
+    """Parser for COCO dataset annotations and filenames."""
 
     # Dataset parent directory.
     PARENT_DIR = "../data"
@@ -20,8 +20,7 @@ class Parser:
         """
         assert dataset == "train" or dataset == "validation", "Dataset input can be either 'train' or 'validation'."
         self._dataset = dataset
-        annotations_filename = os.path.join(Parser.PARENT_DIR, "annotations", f"instances_{self._data_type}.json")
-        self._info = Parser._get_annotations(filename=annotations_filename)
+        self._info = Parser._get_annotations(filename=self._annotation_file)
 
     def get_path(self, filename):
         """
@@ -38,6 +37,13 @@ class Parser:
         return self._info
 
     @property
+    def _annotation_file(self):
+        """
+        :return str: annotations file name and full path.
+        """
+        return os.path.join(Parser.PARENT_DIR, "annotations", f"instances_{self._data_type}.json")
+
+    @property
     def _data_type(self):
         """
         :return str: data sub-directory named according to "train" or "validation" data type.
@@ -47,12 +53,11 @@ class Parser:
     @staticmethod
     def _get_annotations(filename):
         """
-        :param str filename: annotations filename (full path).
+        :param str filename: COCO dataset annotations filename (full path)".
         :return list: list of lists with filenames and their associated list of ground truth detection bounding boxes.
         """
-        coco_gt = COCO(filename)
-        annotation_ids = coco_gt.getAnnIds(catIds=[1], areaRng=[10000, 100000])  # Category: person, large box area.
+        coco_gt = COCO(annotation_file=filename)
         boxes = defaultdict(list)
-        for annotation in coco_gt.loadAnns(ids=annotation_ids):
+        for annotation in coco_gt.loadAnns(ids=coco_gt.getAnnIds(catIds=[1], areaRng=[10000, 100000])):  # Person + big.
             boxes[annotation["image_id"]].append(annotation["bbox"])
-        return [(image["file_name"], boxes[image["id"]]) for image in coco_gt.loadImgs(ids=boxes.keys())]
+        return [(image["file_name"], boxes[image["id"]], image["id"]) for image in coco_gt.loadImgs(ids=boxes.keys())]
