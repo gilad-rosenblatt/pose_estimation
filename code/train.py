@@ -3,8 +3,8 @@ from time import time
 import tensorflow as tf
 from tensorflow.python.keras.callbacks import TensorBoard
 
-from dataset import Dataset
-from loss import DetectionLoss
+from datasets import Dataset
+from losses import DetectionLoss
 from models import get_model
 
 

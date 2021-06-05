@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from dataset import Dataset
+from datasets import Dataset
 
 
 class WeightedMSE(tf.keras.losses.Loss):
@@ -58,6 +58,7 @@ class DetectionLoss(WeightedMSE):
         return mse_cls + mse_reg
 
 
+# FIXME get nans sometimes during training (do not ude this loss).
 class ScaledDetectionLoss(DetectionLoss):
     """Compound MSE-based loss for object detection containing classification and two (scaled) regression parts."""
 

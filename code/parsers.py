@@ -16,18 +16,20 @@ class Parser:
 
     def __init__(self, dataset):
         """
+        Initialize a parser object for the given dataset and parse its annotations.
+
         :param str dataset: either "train" or "validation".
         """
         assert dataset == "train" or dataset == "validation", "Dataset input can be either 'train' or 'validation'."
         self._dataset = dataset
-        self._info = Parser._get_annotations(filename=self._annotation_file)
+        self._info = Parser._get_annotations(filename=Parser.get_annotation_file(dataset=dataset))
 
     def get_path(self, filename):
         """
         :param str filename: name of an image file in the data folder.
         :return str: full path to the image file (to be used as input to image show method) assuming file exists.
         """
-        return os.path.join(Parser.PARENT_DIR, self._data_type, filename)
+        return os.path.join(Parser.PARENT_DIR, Parser.get_data_dir(dataset=self._dataset), filename)
 
     @property
     def info(self):
@@ -36,19 +38,23 @@ class Parser:
         """
         return self._info
 
-    @property
-    def _annotation_file(self):
+    @staticmethod
+    def get_data_dir(dataset):
         """
+        :param str dataset: dataset to return the sub-directory name for ("train" or "validation").
+        :return str: sub-directory name containing the dataset images.
+        """
+        assert dataset == "train" or dataset == "validation", "Dataset input can be either 'train' or 'validation'."
+        return Parser.TRAIN_DIR if dataset == "train" else Parser.VALIDATION_DIR
+
+    @staticmethod
+    def get_annotation_file(dataset):
+        """
+        :param str dataset: dataset to return the sub-directory name for ("train" or "validation").
         :return str: annotations file name and full path.
         """
-        return os.path.join(Parser.PARENT_DIR, "annotations", f"instances_{self._data_type}.json")
-
-    @property
-    def _data_type(self):
-        """
-        :return str: data sub-directory named according to "train" or "validation" data type.
-        """
-        return Parser.TRAIN_DIR if self._dataset == "train" else Parser.VALIDATION_DIR
+        assert dataset == "train" or dataset == "validation", "Dataset input can be either 'train' or 'validation'."
+        return os.path.join(Parser.PARENT_DIR, "annotations", f"instances_{Parser.get_data_dir(dataset=dataset)}.json")
 
     @staticmethod
     def _get_annotations(filename):

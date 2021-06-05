@@ -1,4 +1,4 @@
-# TODO evaluate mAP metric (use COCO API). Compare to literature. Define custom TF metric class?
+# TODO Define custom TF metric class?
 # TODO deeper/more/better blocks
 # TODO add anchors.
 # TODO go multiclass.

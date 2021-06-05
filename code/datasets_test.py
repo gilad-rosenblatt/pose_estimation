@@ -1,7 +1,7 @@
 import unittest
 import cv2
 import numpy as np
-from dataset import Dataset
+from datasets import Dataset
 
 
 class TestDataset(unittest.TestCase):

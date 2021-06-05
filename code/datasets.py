@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-from encoder import BoxEncoder
+from encoders import BoxEncoder
 from parsers import Parser
 from plotters import Plotter
 
@@ -118,7 +118,7 @@ class Dataset(tf.keras.utils.Sequence):
             generator = (self._resize(image, boxes) for image, boxes in generator)
 
         # Show the image and boxes.
-        Plotter.show(generator)
+        Plotter.show_generator(generator)
 
 
 if __name__ == "__main__":

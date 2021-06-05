@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from dataset import Dataset
+from datasets import Dataset
 from plotters import Plotter
 
 
@@ -25,13 +25,15 @@ def main():
 
     # Load models and show their predictions on the test batch (press "q" to exit).
     # About compile=False: <https://stackoverflow.com/questions/60530304/loading-custom-model-with-tensorflow-2-1>.
+    cls_threshold = 0.8
+    nms_threshold = 0.3
     models_dir = "../models"
     for stage, filename in filenames.items():
         print(f"Loading {stage}...")
         model = tf.keras.models.load_model(os.path.join(models_dir, filename), compile=False)
         y_prob = model.predict(x=x)
-        y_pred = np.where(y_prob[..., 0:1] > 0.85, y_prob, 0)  # Apply threshold to classification/confidence score.
-        Plotter.show_batch(x=x, y_true=y_true, y_pred=y_pred)
+        y_pred = np.where(y_prob[..., 0:1] > cls_threshold, y_prob, 0)  # Classify by applying threshold score.
+        Plotter.show_batch(x=x, y_true=y_true, y_pred=y_pred, nms_threshold=nms_threshold)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,11 @@
+import os
 import cv2
 import numpy as np
+from pycocotools.coco import COCO
 
 from boxops import NMS
-from encoder import BoxEncoder
+from encoders import BoxEncoder
+from parsers import Parser
 
 
 class Plotter:
@@ -13,7 +16,12 @@ class Plotter:
     COLORS = 255 * np.random.rand(NUM_COLORS, 3)
 
     @staticmethod
-    def show(generator):
+    def show_generator(generator):
+        """
+        Show the generated images and their bounding box annotations image by image.
+
+        :param generator: generator of single image, boxes pairs.
+        """
 
         # Show each image along with its bounding boxes in sequence.
         window_name = "bounding_boxes"
@@ -33,12 +41,19 @@ class Plotter:
         cv2.destroyWindow(window_name)
 
     @staticmethod
-    def show_batch(x, y_true, y_pred):
+    def show_batch(x, y_true, y_pred, nms_threshold=0.3):
+        """
+        Show the batch ground truth and predictions image by image.
+
+        :param np.nd.array x: a (batch_size, *image_shape, 3) array of normalized (values in 0-1) images.
+        :param np.nd.array y_true: (batch_size, *cells_shape, 5) ground-truth encoding bounding boxes and 0/1 scores.
+        :param np.nd.array y_pred: (batch_size, *cells_shape, 5) model output encoding bounding boxes and scores.
+        :param float nms_threshold: threshold used for non-max suppression when post processing the prediction boxes.
+        """
 
         # Get input and output dimensions.
         _, *image_shape, _ = x.shape
         _, *cells_shape, _ = y_true.shape
-        *_, num_output_channels = y_pred.shape
 
         # Initialize encoder.
         encoder = BoxEncoder(image_shape=image_shape, cells_shape=cells_shape)
@@ -54,7 +69,7 @@ class Plotter:
             boxes_true, _ = encoder.decode(this_y=this_y)
             centers_true = encoder.get_centers(boxes=boxes_true)
             boxes_pred, scores = encoder.decode(this_y=this_pred)
-            boxes_pred, scores = NMS.perform(boxes=boxes_pred, scores=scores, threshold=0.3)
+            boxes_pred, scores = NMS.perform(boxes=boxes_pred, scores=scores, threshold=nms_threshold)
             centers_pred = encoder.get_centers(boxes=boxes_pred)
 
             # Get colors for boxes based on the output grid cell their center points fall in.
@@ -72,6 +87,40 @@ class Plotter:
 
             # Show the image with drawn bounding boxes and circles.
             cv2.imshow(window_name, image)
+
+            # Break the loop if key 'q' was pressed.
+            if cv2.waitKey() & 0xFF == ord("q"):
+                break
+
+        # Close the window.
+        cv2.destroyWindow(window_name)
+
+    @staticmethod
+    def show_annotations(annotations):
+        """
+        Show the images corresponding to the input annotations along with their bounding box annotations image by image.
+
+        :param list annotations: list of similarly formatted dictionaries each is an annotation in COCO format.
+        """
+
+        # Load the COCO annotations associated with json results file.
+        coco_gt = COCO(annotation_file=Parser.get_annotation_file(dataset="validation"))
+        path_to_data = os.path.join(Parser.PARENT_DIR, Parser.get_data_dir(dataset="validation"))
+
+        # Show each annotation drawn on it corresponding image in sequence.
+        window_name = "bounding_boxes"
+        for annotation in annotations:
+
+            # Load the image corresponding to this annotation.
+            image_dict = coco_gt.loadImgs(ids=annotation["image_id"])[0]
+            this_image = cv2.imread(os.path.join(path_to_data, image_dict['file_name']))
+
+            # Get the bounding box from the annotation.
+            box = np.array(annotation["bbox"])
+            Plotter._draw_boxes(image=this_image, boxes=box[np.newaxis, :])
+
+            # Show the image with drawn bounding box.
+            cv2.imshow(window_name, this_image)
 
             # Break the loop if key 'q' was pressed.
             if cv2.waitKey() & 0xFF == ord("q"):
