@@ -9,7 +9,7 @@ from pycocotools.cocoeval import COCOeval
 
 from boxops import NMS
 from datasets import Dataset
-from encoders import BoxEncoder
+from encoders import DetectionsEncoder
 from plotters import DetectionsPlotter
 from parsers import DetectionsParser
 
@@ -47,7 +47,7 @@ class ModelEvaluator:
         model = tf.keras.models.load_model(os.path.join(ModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
 
         # Initialize encoder (model output <--> boxes and scores).
-        encoder = BoxEncoder(image_shape=dataset.IMAGE_SHAPE, cells_shape=dataset.CELLS_SHAPE)
+        encoder = DetectionsEncoder(input_shape=dataset.IMAGE_SHAPE, output_shape=dataset.CELLS_SHAPE)
 
         # Initialize the list of annotations (detections).
         annotations = []

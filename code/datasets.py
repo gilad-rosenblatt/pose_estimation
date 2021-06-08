@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-from encoders import BoxEncoder
+from encoders import DetectionsEncoder
 from parsers import DetectionsParser
 from plotters import DetectionsPlotter
 
@@ -32,7 +32,7 @@ class Dataset(tf.keras.utils.Sequence):
         self.generate_image_ids = generate_image_ids
         self._parser = DetectionsParser(dataset=dataset)
         self._indices = np.arange(0, len(self._parser.info))
-        self._encoder = BoxEncoder(image_shape=Dataset.IMAGE_SHAPE, cells_shape=Dataset.CELLS_SHAPE)
+        self._encoder = DetectionsEncoder(input_shape=Dataset.IMAGE_SHAPE, output_shape=Dataset.CELLS_SHAPE)
 
     def __len__(self):
         """
@@ -96,7 +96,7 @@ class Dataset(tf.keras.utils.Sequence):
         :return tuple: images resized to class resize shape (model input shape) and bounding boxes resized accordingly.
         """
         height, width, _ = image.shape
-        boxes = BoxEncoder.scale(boxes=boxes, from_shape=(height, width), to_shape=Dataset.IMAGE_SHAPE)
+        boxes = DetectionsEncoder.scale(boxes=boxes, from_shape=(height, width), to_shape=Dataset.IMAGE_SHAPE)
         image = cv2.resize(image, dsize=tuple(reversed(Dataset.IMAGE_SHAPE)))  # Use opencv convention (width, height).
         return image, boxes
 

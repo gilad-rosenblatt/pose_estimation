@@ -1,18 +1,34 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 
 
-class BoxEncoder:
-    """Encoder for bounding boxes in an image divided into grid cells."""
+class DataEncoder(ABC):
+    """Encoder annotations data in an image for a convolutional neural network."""
 
-    def __init__(self, image_shape, cells_shape):
+    def __init__(self, input_shape, output_shape):
         """
-        Save input (image) and output (cells) grid dimensions.
+        Save input (image) and network output (grid) dimensions.
 
-        :param tuple image_shape: shape of input image.
-        :param tuple cells_shape: shape of output grid cells.
+        :param tuple input_shape: shape of network input image.
+        :param tuple output_shape: shape of network output grid.
         """
-        self.image_shape = image_shape
-        self.cells_shape = cells_shape
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+
+    @abstractmethod
+    def encode(self, *args, **kwargs):
+        """Encode image annotations data into network output representation (for producing ground truth at train)."""
+        pass
+
+    @abstractmethod
+    def decode(self, *args, **kwargs):
+        """Decode image annotations data from network output representation (for prediction/inference at test)."""
+        pass
+
+
+class DetectionsEncoder(DataEncoder):
+    """Encoder for detection bounding boxes in an image for an object detection network."""
 
     def encode(self, boxes):
         """
@@ -26,10 +42,10 @@ class BoxEncoder:
         """
 
         # Extract grid cell width and height.
-        output_height, output_width = self.cells_shape
+        output_height, output_width = self.output_shape
 
         # Scale boxes to output grid cell size.
-        boxes = BoxEncoder.scale(boxes=boxes, from_shape=self.image_shape, to_shape=self.cells_shape)
+        boxes = DetectionsEncoder.scale(boxes=boxes, from_shape=self.input_shape, to_shape=self.output_shape)
 
         # Convert upper left corner to box centers and normalize width and height.
         boxes[:, 0] += boxes[:, 2] / 2  # x1 --> xc = x1 + w / 2.
@@ -45,7 +61,7 @@ class BoxEncoder:
         boxes[:, :2] = np.mod(boxes[:, :2], 1)
 
         # Encode boxes: 1 in 1st channel means a box [xc, yc, w, h] is associated with this cell.
-        this_y = np.zeros(shape=(*self.cells_shape, 5))
+        this_y = np.zeros(shape=(*self.output_shape, 5))
         this_y[rows, cols] = np.concatenate((np.ones(shape=(boxes.shape[0], 1)), boxes), axis=1)
 
         # Return output array.
@@ -65,8 +81,8 @@ class BoxEncoder:
         rows, cols = np.nonzero(this_y[:, :, 0])
 
         # Extract input and output width and height.
-        input_height, input_width = self.image_shape
-        output_height, output_width = self.cells_shape
+        input_height, input_width = self.input_shape
+        output_height, output_width = self.output_shape
 
         # Fill box parameters in the form [x1, y1, w, h] measured in input image pixels.
         xc = (cols[:, np.newaxis] + this_y[rows, cols, 1:2]) * input_width / output_width  # Box center xc.
@@ -79,33 +95,6 @@ class BoxEncoder:
         # Return boxes and scores.
         return boxes, scores
 
-    def decode_centers(self, partial_y):
-        """
-        Decode a partial single sample y prediction in grid cell into "responsible" cell centers in input image pixels.
-
-        :param np.ndarray partial_y: (*CELLS_SHAPE, <=3) array [detected y/n, cell-relative xc, yc, normalized w, h].
-        :return np.ndarray: (num_boxes, 2) array where each row represents responsible cell centers in [xc, yc] format.
-        """
-
-        # Instantiate a full single-sample y array.
-        this_y = np.zeros(shape=(*self.cells_shape, 5), dtype=np.float32)
-
-        # Copy the scores from the partial y array.
-        this_y[..., 0] = partial_y[..., 0]
-
-        # Get the row and column indices of cells associated with boxes (non-zero score).
-        rows, cols = np.nonzero(partial_y[:, :, 0])
-
-        # Fill box centers or use cell centers if no box centers are provided.
-        if partial_y.shape[-1] < 3:
-            this_y[rows, cols, 1:3] = 0.5  # Set box upper left corner to cell's center (w, h = 0).
-        else:
-            this_y[rows, cols, 1:3] = partial_y[rows, cols, 1:3]  # Add shift relative to cell's upper left corner.
-
-        # Decode the full y array and return box centers and scores (x1, y1 coordinates of decoded boxes = xc, yc).
-        boxes, scores = self.decode(this_y=this_y)
-        return boxes[:, :2], scores
-
     def get_cells(self, centers):
         """
         Get the responsible cell indices for box centers given in image pixel coordinates.
@@ -115,8 +104,8 @@ class BoxEncoder:
         """
 
         # Extract old and new image width and height.
-        from_height, from_width = self.image_shape
-        to_height, to_width = self.cells_shape
+        from_height, from_width = self.input_shape
+        to_height, to_width = self.output_shape
 
         # Rescale bounding box centers [xc, yc] to grid cell units and floor to get responsible cell [row, col] indices.
         cells = np.empty(shape=centers.shape, dtype=int)
@@ -158,3 +147,9 @@ class BoxEncoder:
 
         # Return scaled boxes.
         return boxes_scaled
+
+
+class KeypointsEncoder(DataEncoder):
+    """Encoder for person keypoints in an image for a pose estimation network."""
+
+    pass

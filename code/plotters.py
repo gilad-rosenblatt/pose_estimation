@@ -6,7 +6,7 @@ import numpy as np
 from pycocotools.coco import COCO
 
 from boxops import NMS
-from encoders import BoxEncoder
+from encoders import DetectionsEncoder
 from parsers import DetectionsParser, KeypointsParser
 
 
@@ -258,7 +258,7 @@ class DetectionsPlotter:
         _, *cells_shape, _ = y_true.shape
 
         # Initialize encoder.
-        encoder = BoxEncoder(image_shape=image_shape, cells_shape=cells_shape)
+        encoder = DetectionsEncoder(input_shape=image_shape, output_shape=cells_shape)
 
         # Show ground-truth and predictions for each image in sequence.
         window_name = "annotation_boxes"
