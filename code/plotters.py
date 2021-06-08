@@ -208,7 +208,7 @@ class Skeleton:
         :param np.ndarray box: box array sized (4,) for x1, y1, width, height in image pixel units.
         """
         if isinstance(box, np.ndarray):
-            yellow = np.ndarray((0, 204, 204), dtype=np.unit8)
+            yellow = (0, 204, 204)
             Drawer.draw_boxes(image=image, boxes=np.array(box)[np.newaxis, :], colors=[yellow])
         lines, colors = Skeleton._make_lines(keypoints=keypoints)
         Drawer.draw_lines(image=image, lines=lines, colors=colors, mark_endpoints=True)

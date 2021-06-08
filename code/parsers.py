@@ -110,7 +110,7 @@ class KeypointsParser(Parser):
         return [
             (coco_gt.loadImgs(ids=annotation["image_id"])[0]["file_name"], annotation["bbox"], annotation["keypoints"])
             for annotation in coco_gt.loadAnns(ids=coco_gt.getAnnIds(catIds=[1]))  # All person annotations.
-            if not annotation["iscrowd"] and annotation["num_keypoints"] > 0  # Single object with (some) keypoints.
+            if not annotation["iscrowd"] and annotation["num_keypoints"] > 0 and annotation["area"] > 0  # Drop empties.
         ]
 
 
