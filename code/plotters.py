@@ -1,6 +1,7 @@
 import os
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 from pycocotools.coco import COCO
 
@@ -32,7 +33,7 @@ class Drawer:
         Draw boxes one-by-one on the image (carries side effect to image array).
 
         :param np.ndarray image: image to draw on (assumed uint8 BGR image).
-        :param np.ndarray boxes: boxes array sized (num_boxes, x1, y1, width, height) in image pixel units.
+        :param np.ndarray boxes: boxes array sized (num_boxes, 4) for x1, y1, width, height in image pixel units.
         :param list colors: list of BGR colors in 0-255 one for each input point.
         :param int thickness: line thickness to use.
         """
@@ -122,6 +123,95 @@ class Drawer:
             if mark_endpoints:
                 points = np.vstack((start_point, end_point))
                 Drawer.draw_circles(image=image, points=points, colors=[color] * 2, thickness=-1, radius=radius)
+
+
+class Skeleton:
+    """Representation of a person's keypoints skeleton."""
+
+    # Interpretation of each of the 17 person keypoints by index.
+    # FIXME missing 1 keypoint name.
+    KEYPOINT_NAMES = [
+        "nose"
+        "left_eye",
+        "right_eye",
+        "left_ear",
+        "right_ear",
+        "left_shoulder",
+        "right_shoulder",
+        "left_elbow",
+        "right_elbow",
+        "left_wrist",
+        "right_wrist",
+        "left_hip",
+        "right_hip",
+        "left_knee",
+        "right_knee",
+        "left_ankle",
+        "right_ankle"
+    ]
+
+    # Skeleton lines encoded in keypoint indices (0-based) and their corresponding colors.
+    SKELETON = [
+        [15, 13],
+        [13, 11],
+        [16, 14],
+        [14, 12],
+        [11, 12],
+        [5, 11],
+        [6, 12],
+        [5, 6],
+        [5, 7],
+        [6, 8],
+        [7, 9],
+        [8, 10],
+        [1, 2],
+        [0, 1],
+        [0, 2],
+        [1, 3],
+        [2, 4],
+        [3, 5],
+        [4, 6]
+    ]
+    SKELETON_COLORS = [
+        (int(b), int(g), int(r))
+        for (r, g, b, a) in 255 * plt.cm.get_cmap(name="rainbow")(np.linspace(start=0, stop=1, num=len(SKELETON)))
+    ]
+
+    @staticmethod
+    def _make_lines(keypoints):
+        """
+        Make skeleton lines out of an input keypoints array for a single person.
+
+        :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
+        :return np.ndarray: lines array sized (num_lines, 2, 2) in pixel units denoting start/end keypoints in (x, y).
+        """
+        lines = np.empty(shape=(len(Skeleton.SKELETON), 2, 2))
+        colors = []
+        keypoint_exists = np.all(keypoints != 0, axis=1)
+        index = 0
+        for (start, end), color in zip(Skeleton.SKELETON, Skeleton.SKELETON_COLORS):
+            if not keypoint_exists[start] or not keypoint_exists[end]:
+                continue  # Do not use skeleton lines for missing keypoints.
+            lines[index, 0, :] = keypoints[start, 0:2]
+            lines[index, 1, :] = keypoints[end, 0:2]
+            colors.append(color)
+            index += 1
+        return lines[:index], colors  # Return only valid indices.
+
+    @staticmethod
+    def draw(image, keypoints, box=None):
+        """
+        Make skeleton lines out of an input keypoints array for a single person over a given image. Optionally add box.
+
+        :param np.ndarray image: image to draw on (assumed uint8 BGR image).
+        :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
+        :param np.ndarray box: box array sized (4,) for x1, y1, width, height in image pixel units.
+        """
+        if isinstance(box, np.ndarray):
+            yellow = np.ndarray((0, 204, 204), dtype=np.unit8)
+            Drawer.draw_boxes(image=image, boxes=np.array(box)[np.newaxis, :], colors=[yellow])
+        lines, colors = Skeleton._make_lines(keypoints=keypoints)
+        Drawer.draw_lines(image=image, lines=lines, colors=colors, mark_endpoints=True)
 
 
 class DetectionsPlotter:
@@ -242,85 +332,44 @@ class DetectionsPlotter:
         cv2.destroyWindow(window_name)
 
 
-class Skeleton:
-    """Representation of a person's keypoints skeleton."""
-
-    # Interpretation of each of the 17 person keypoints by index.
-    KEYPOINT_NAMES = [
-        "nose"
-        "left_eye",
-        "right_eye",
-        "left_ear",
-        "right_ear",
-        "left_shoulder",
-        "right_shoulder",
-        "left_elbow",
-        "right_elbow",
-        "left_wrist",
-        "right_wrist",
-        "left_hip",
-        "right_hip",
-        "left_knee",
-        "right_knee",
-        "left_ankle",
-        "right_ankle"
-    ]
-
-    # Skeleton lines encoded in keypoint indices (0-based).
-    SKELETON = [
-        [15, 13],
-        [13, 11],
-        [16, 14],
-        [14, 12],
-        [11, 12],
-        [5, 11],
-        [6, 12],
-        [5, 6],
-        [5, 7],
-        [6, 8],
-        [7, 9],
-        [8, 10],
-        [1, 2],
-        [0, 1],
-        [0, 2],
-        [1, 3],
-        [2, 4],
-        [3, 5],
-        [4, 6]
-    ]
+class KeypointsPlotter:
 
     @staticmethod
-    def make_lines(keypoints):
+    def show_generator(generator):
         """
-        Make skeleton lines out of the keypoints array for a single person.
+        Show the generated images and their person keypoints (skeleton) and bounding box annotations image by image.
 
-        :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
+        :param generator: generator of single image, a (4,) bounding box, and (17,) keypoints trio.
         """
-        keypoint_exists = np.all(keypoints != 0, axis=1)
-        lines = np.empty(shape=(len(Skeleton.SKELETON), 2, 2))
-        index = 0
-        for start, end in Skeleton.SKELETON:
-            if not keypoint_exists[start] or not keypoint_exists[end]:
-                continue
-            lines[index, 0, :] = keypoints[start, 0:2]
-            lines[index, 1, :] = keypoints[end, 0:2]
-            index += 1
-        return lines[:index]
+
+        # Show each image along with its bounding boxes in sequence.
+        window_name = "keypoints"
+        for image, box, keypoints in generator:
+
+            # Draw skeleton with bounding box on the image.
+            Skeleton.draw(image=image, keypoints=keypoints, box=box)
+
+            # Show the image with drawn bounding boxes.
+            cv2.imshow(window_name, image)
+
+            # Break the loop if key 'q' was pressed.
+            if cv2.waitKey() & 0xFF == ord("q"):
+                break
+
+        # Close the window.
+        cv2.destroyWindow(window_name)
 
 
 if __name__ == "__main__":
+
+    # Parse keypoints COCO annotations.
     parser = KeypointsParser(dataset="validation")
-    window_name = "bounding_boxes"
-    for filename, box, keypoints in parser.info:
-        this_image = cv2.imread(filename=parser.get_path(filename=filename))
 
-        keypoints = np.array(keypoints).reshape(-1, 3)
-        lines = Skeleton.make_lines(keypoints)
+    # Creates generator that loads each image in sequence and instantiate a numpy array for its keypoints and boxes.
+    generator = (
+        (cv2.imread(filename=parser.get_path(filename=filename)), box, np.array(keypoints).reshape(-1, 3))
+        for filename, box, keypoints in parser.info
+    )
 
-        Drawer.draw_boxes(image=this_image, boxes=np.array(box)[np.newaxis, :])
-        Drawer.draw_lines(image=this_image, lines=lines, mark_endpoints=True)
-        cv2.imshow(window_name, this_image)
-
-        if cv2.waitKey() & 0xFF == ord("q"):
-            break
-    cv2.destroyWindow(window_name)
+    # Show the image and skeletons.
+    KeypointsPlotter.show_generator(generator)
