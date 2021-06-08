@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from datasets import Dataset
-from plotters import Plotter
+from plotters import DetectionsPlotter
 
 
 def main():
@@ -33,7 +33,7 @@ def main():
         model = tf.keras.models.load_model(os.path.join(models_dir, filename), compile=False)
         y_prob = model.predict(x=x)
         y_pred = np.where(y_prob[..., 0:1] > cls_threshold, y_prob, 0)  # Classify by applying threshold score.
-        Plotter.show_batch(x=x, y_true=y_true, y_pred=y_pred, nms_threshold=nms_threshold)
+        DetectionsPlotter.show_batch(x=x, y_true=y_true, y_pred=y_pred, nms_threshold=nms_threshold)
 
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ class Parser(ABC):
         pass
 
 
-class DetectionParser(Parser):
+class DetectionsParser(Parser):
     """Parser for COCO dataset bounding box annotations and filenames (for detection tasks)."""
 
     @staticmethod

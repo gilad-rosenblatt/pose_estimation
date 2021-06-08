@@ -10,8 +10,8 @@ from pycocotools.cocoeval import COCOeval
 from boxops import NMS
 from datasets import Dataset
 from encoders import BoxEncoder
-from plotters import Plotter
-from parsers import DetectionParser
+from plotters import DetectionsPlotter
+from parsers import DetectionsParser
 
 
 class ModelEvaluator:
@@ -41,7 +41,7 @@ class ModelEvaluator:
 
         # Load dataset and and COCO API object.
         dataset = Dataset(batch_size=64, dataset=self.dataset, generate_image_ids=True)
-        coco_gt = COCO(annotation_file=DetectionParser.get_annotation_file(dataset=self.dataset))
+        coco_gt = COCO(annotation_file=DetectionsParser.get_annotation_file(dataset=self.dataset))
 
         # Load model.
         model = tf.keras.models.load_model(os.path.join(ModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
@@ -105,7 +105,7 @@ class ModelEvaluator:
         ids = list(set([detection["image_id"] for detection in detections]))
 
         # Load the ground-truth and detection COCO annotations objects.
-        coco_gt = COCO(annotation_file=DetectionParser.get_annotation_file(dataset="validation"))
+        coco_gt = COCO(annotation_file=DetectionsParser.get_annotation_file(dataset="validation"))
         coco_dt = coco_gt.loadRes(resFile=full_filename)
 
         # Instantiate and configure and evaluation object.
@@ -131,7 +131,7 @@ class ModelEvaluator:
         """
         with open(os.path.join(ModelEvaluator.SCORES_DIR, filename), "r") as in_file:
             detections = json.load(in_file)
-        Plotter.show_annotations(detections)
+        DetectionsPlotter.show_annotations(detections)
 
     @staticmethod
     def get_filename(model_filename, cls_threshold, nms_threshold):
