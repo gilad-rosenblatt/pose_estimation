@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from encoders import BoxEncoder
-from parsers import Parser
+from parsers import DetectionParser
 from plotters import Plotter
 
 
@@ -30,7 +30,7 @@ class Dataset(tf.keras.utils.Sequence):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.generate_image_ids = generate_image_ids
-        self._parser = Parser(dataset=dataset)
+        self._parser = DetectionParser(dataset=dataset)
         self._indices = np.arange(0, len(self._parser.info))
         self._encoder = BoxEncoder(image_shape=Dataset.IMAGE_SHAPE, cells_shape=Dataset.CELLS_SHAPE)
 
@@ -110,7 +110,7 @@ class Dataset(tf.keras.utils.Sequence):
         # Creates generator that loads each image in sequence and instantiate a numpy array for its boxes.
         generator = (
             (cv2.imread(self._parser.get_path(filename)), np.array(box_list, dtype=np.float32))
-            for filename, box_list in self._parser.info
+            for filename, box_list, _ in self._parser.info
         )
 
         # Resize image and boxes to model input shape.

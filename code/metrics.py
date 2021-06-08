@@ -11,7 +11,7 @@ from boxops import NMS
 from datasets import Dataset
 from encoders import BoxEncoder
 from plotters import Plotter
-from parsers import Parser
+from parsers import DetectionParser
 
 
 class ModelEvaluator:
@@ -41,7 +41,7 @@ class ModelEvaluator:
 
         # Load dataset and and COCO API object.
         dataset = Dataset(batch_size=64, dataset=self.dataset, generate_image_ids=True)
-        coco_gt = COCO(annotation_file=Parser.get_annotation_file(dataset=self.dataset))
+        coco_gt = COCO(annotation_file=DetectionParser.get_annotation_file(dataset=self.dataset))
 
         # Load model.
         model = tf.keras.models.load_model(os.path.join(ModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
@@ -105,7 +105,7 @@ class ModelEvaluator:
         ids = list(set([detection["image_id"] for detection in detections]))
 
         # Load the ground-truth and detection COCO annotations objects.
-        coco_gt = COCO(annotation_file=Parser.get_annotation_file(dataset="validation"))
+        coco_gt = COCO(annotation_file=DetectionParser.get_annotation_file(dataset="validation"))
         coco_dt = coco_gt.loadRes(resFile=full_filename)
 
         # Instantiate and configure and evaluation object.

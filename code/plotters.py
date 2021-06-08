@@ -5,7 +5,7 @@ from pycocotools.coco import COCO
 
 from boxops import NMS
 from encoders import BoxEncoder
-from parsers import Parser
+from parsers import DetectionParser
 
 
 class Plotter:
@@ -104,8 +104,8 @@ class Plotter:
         """
 
         # Load the COCO annotations associated with json results file.
-        coco_gt = COCO(annotation_file=Parser.get_annotation_file(dataset="validation"))
-        path_to_data = os.path.join(Parser.PARENT_DIR, Parser.get_data_dir(dataset="validation"))
+        coco_gt = COCO(annotation_file=DetectionParser.get_annotation_file(dataset="validation"))
+        path_to_data = os.path.join(DetectionParser.PARENT_DIR, DetectionParser.get_data_dir(dataset="validation"))
 
         # Show each annotation drawn on it corresponding image in sequence.
         window_name = "bounding_boxes"
