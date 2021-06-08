@@ -1,11 +1,12 @@
 import os
+
 import cv2
 import numpy as np
 from pycocotools.coco import COCO
 
 from boxops import NMS
 from encoders import BoxEncoder
-from parsers import DetectionsParser
+from parsers import DetectionsParser, KeypointsParser
 
 
 class Drawer:
@@ -43,7 +44,8 @@ class Drawer:
                 (int(x1), int(y1)),  # Upper left corner.
                 (int(x1 + w), int(y1 + h)),  # Lower right corner.
                 color=color,
-                thickness=thickness
+                thickness=thickness,
+                lineType=cv2.LINE_AA
             )
 
     @staticmethod
@@ -52,7 +54,7 @@ class Drawer:
         Draw circles one-by-one on the image (carries side effect to image array).
 
         :param np.ndarray image: image to draw on (assumed uint8 BGR image).
-        :param np.ndarray points: points array sized (num_points, xc, yc) in image pixel units.
+        :param np.ndarray points: points array sized (num_points, 2) in image pixel units.
         :param list colors: list of BGR colors in 0-255 one for each input point.
         :param int thickness: line thickness to use.
         :param int radius: radius to use when drawing circles.
@@ -65,7 +67,8 @@ class Drawer:
                 center=(int(xc), int(yc)),  # Center point.
                 radius=radius,
                 color=color,
-                thickness=thickness
+                thickness=thickness,
+                lineType=cv2.LINE_AA
             )
 
     @staticmethod
@@ -75,8 +78,8 @@ class Drawer:
 
         :param np.ndarray scores: scores to write at input points of size (num_points,)
         :param np.ndarray image: image to draw on (assumed uint8 BGR image).
-        :param np.ndarray points: scores array sized (num_points, score).
-        :param np.ndarray points: points array sized (num_points, xc, yc) in image pixel units.
+        :param np.ndarray points: scores array sized (num_points, 1).
+        :param np.ndarray points: points array sized (num_points, 2) in image pixel units.
         :param list colors: list of BGR colors in 0-255 one for each input point.
         :param int thickness: line thickness to use.
         """
@@ -92,6 +95,33 @@ class Drawer:
                 fontScale=1 / 2,
                 thickness=thickness
             )
+
+    @staticmethod
+    def draw_lines(image, lines, colors=None, thickness=2, radius=3, mark_endpoints=False):
+        """
+        Draw lines one-by-one on the image and mark their endpoints (carries side effect to image array).
+
+        :param np.ndarray image: image to draw on (assumed uint8 BGR image).
+        :param np.ndarray lines: lines array sized (num_lines, 2, 2) in pixel units denoting start/end point (x, y).
+        :param list colors: list of BGR colors in 0-255 one for each input line.
+        :param int thickness: line thickness to use.
+        :param int radius: radius to use when drawing endpoints.
+        :param bool mark_endpoints: if True marks the endpoints of each line with circles.
+        """
+        if not colors:
+            colors = [Drawer.get_color(index=index) for index, _ in enumerate(lines)]
+        for (start_point, end_point), color in zip(lines, colors):
+            image = cv2.line(
+                image,
+                start_point.astype(int),
+                end_point.astype(int),
+                color=color,
+                thickness=thickness,
+                lineType=cv2.LINE_AA
+            )
+            if mark_endpoints:
+                points = np.vstack((start_point, end_point))
+                Drawer.draw_circles(image=image, points=points, colors=[color] * 2, thickness=-1, radius=radius)
 
 
 class DetectionsPlotter:
@@ -210,3 +240,87 @@ class DetectionsPlotter:
 
         # Close the window.
         cv2.destroyWindow(window_name)
+
+
+class Skeleton:
+    """Representation of a person's keypoints skeleton."""
+
+    # Interpretation of each of the 17 person keypoints by index.
+    KEYPOINT_NAMES = [
+        "nose"
+        "left_eye",
+        "right_eye",
+        "left_ear",
+        "right_ear",
+        "left_shoulder",
+        "right_shoulder",
+        "left_elbow",
+        "right_elbow",
+        "left_wrist",
+        "right_wrist",
+        "left_hip",
+        "right_hip",
+        "left_knee",
+        "right_knee",
+        "left_ankle",
+        "right_ankle"
+    ]
+
+    # Skeleton lines encoded in keypoint indices (0-based).
+    SKELETON = [
+        [15, 13],
+        [13, 11],
+        [16, 14],
+        [14, 12],
+        [11, 12],
+        [5, 11],
+        [6, 12],
+        [5, 6],
+        [5, 7],
+        [6, 8],
+        [7, 9],
+        [8, 10],
+        [1, 2],
+        [0, 1],
+        [0, 2],
+        [1, 3],
+        [2, 4],
+        [3, 5],
+        [4, 6]
+    ]
+
+    @staticmethod
+    def make_lines(keypoints):
+        """
+        Make skeleton lines out of the keypoints array for a single person.
+
+        :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
+        """
+        keypoint_exists = np.all(keypoints != 0, axis=1)
+        lines = np.empty(shape=(len(Skeleton.SKELETON), 2, 2))
+        index = 0
+        for start, end in Skeleton.SKELETON:
+            if not keypoint_exists[start] or not keypoint_exists[end]:
+                continue
+            lines[index, 0, :] = keypoints[start, 0:2]
+            lines[index, 1, :] = keypoints[end, 0:2]
+            index += 1
+        return lines[:index]
+
+
+if __name__ == "__main__":
+    parser = KeypointsParser(dataset="validation")
+    window_name = "bounding_boxes"
+    for filename, box, keypoints in parser.info:
+        this_image = cv2.imread(filename=parser.get_path(filename=filename))
+
+        keypoints = np.array(keypoints).reshape(-1, 3)
+        lines = Skeleton.make_lines(keypoints)
+
+        Drawer.draw_boxes(image=this_image, boxes=np.array(box)[np.newaxis, :])
+        Drawer.draw_lines(image=this_image, lines=lines, mark_endpoints=True)
+        cv2.imshow(window_name, this_image)
+
+        if cv2.waitKey() & 0xFF == ord("q"):
+            break
+    cv2.destroyWindow(window_name)
