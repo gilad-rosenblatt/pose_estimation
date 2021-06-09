@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 
 from parsers import KeypointsParser
-# from plotters import Skeleton, Drawer
+from plotters import Skeleton, Drawer
 
 
 class DataEncoder(ABC):
@@ -49,7 +49,7 @@ class DetectionsEncoder(DataEncoder):
         output_height, output_width = self.output_shape
 
         # Scale boxes to output grid cell size.
-        boxes = DetectionsEncoder.scale(boxes=boxes, from_shape=self.input_shape, to_shape=self.output_shape)
+        boxes = DetectionsEncoder.scale_boxes(boxes=boxes, from_shape=self.input_shape, to_shape=self.output_shape)
 
         # Convert upper left corner to box centers and normalize width and height.
         boxes[:, 0] += boxes[:, 2] / 2  # x1 --> xc = x1 + w / 2.
@@ -120,7 +120,7 @@ class DetectionsEncoder(DataEncoder):
         return cells
 
     @staticmethod
-    def get_centers(boxes):
+    def get_box_centers(boxes):
         """
         Get box center points from boxes.
 
@@ -130,7 +130,7 @@ class DetectionsEncoder(DataEncoder):
         return np.concatenate([boxes[..., 0:1] + boxes[..., 2:3] / 2, boxes[..., 1:2] + boxes[..., 3:] / 2], axis=-1)
 
     @staticmethod
-    def scale(boxes, from_shape, to_shape):
+    def scale_boxes(boxes, from_shape, to_shape):
         """
         Scale bounding boxes to fit resized image.
 
@@ -144,7 +144,7 @@ class DetectionsEncoder(DataEncoder):
         from_height, from_width = from_shape
         to_height, to_width = to_shape
 
-        # Rescale bounding boxes [x1, y1, w, h].
+        # Rescale bounding boxes x1, y1, w, h.
         boxes_scaled = np.empty(shape=boxes.shape, dtype=np.float32)
         boxes_scaled[:, [0, 2]] = boxes[:, [0, 2]] * to_width / from_width
         boxes_scaled[:, [1, 3]] = boxes[:, [1, 3]] * to_height / from_height
@@ -162,11 +162,21 @@ class KeypointsEncoder(DataEncoder):
     def decode(self, *args, **kwargs):
         raise NotImplemented
 
-    def normalize_box(self, box, keypoints, image_shape):
+    @staticmethod
+    def expand_box(box, keypoints, image_shape, aspect_ratio):
+        """
+        Expand the input bounding box (never reduced, unless protruding from the image) to fit all keypoints and the
+        target aspect ratio (if possible). Boxes and keypoints are tested for viability and bad cases raise exceptions.
 
-        # Extract original image dimensions and required dimensions at the input to the network.
+        :param np.ndarray box: (4,) bounding box for in x1, y1, w, h format (1: upper left corner).
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format (0s for missing points).
+        :param tuple image_shape: (image_height, image_width) of the image to which all x, y coordinates refer to.
+        :param aspect_ratio: target aspect ratio for the output bounding box (not guaranteed).
+        :return: (4,) expanded bounding box in same coordinates as input box given as x1, y1, w, h.
+        """
+
+        # Extract original image shape.
         image_height, image_width = image_shape
-        input_height, input_width = self.input_shape
 
         # Unpack the box and assert it is valid. TODO move assert to parser?
         x1, y1, w, h = box
@@ -174,7 +184,7 @@ class KeypointsEncoder(DataEncoder):
         assert h > 0 and w > 0 and x2 > 0 and y2 > 0, "Ill defined bounding box (negative h/w or flipped corners)."
 
         # Unpack keypoints bounding box (minimal box that includes all keypoints). TODO Move assert tp parser?
-        viable_keypoints = keypoints[np.all(keypoints != 0, axis=1)]
+        viable_keypoints = keypoints[keypoints[:, 2] != 0]  # Visibility = 0 indicates a missing keypoint.
         x1_kp = np.min(viable_keypoints[:, 0])
         y1_kp = np.min(viable_keypoints[:, 1])
         x2_kp = np.max(viable_keypoints[:, 0])
@@ -200,7 +210,6 @@ class KeypointsEncoder(DataEncoder):
         y_c = (y1 + y2) / 2
 
         # Enforce aspect ratio by expanding box in the dimension it falls short (prefer symmetric-to-center expansion).
-        aspect_ratio = input_width / input_height
         if w / h > aspect_ratio:
             # Height should be increased.
             new_height = w / aspect_ratio
@@ -239,35 +248,109 @@ class KeypointsEncoder(DataEncoder):
         # Return normalized box in (x1, x2, w, h) format.
         return np.array([x_c - w / 2, y_c - h / 2, w, h])
 
+    @staticmethod
+    def move_keypoints(box, keypoints):
+        """
+        Translate keypoints to coordinates of a cropped part of the image denoted by a bounding box.
+
+        :param np.ndarray box: (4,) crop bounding box x1, y1, w, h (1: upper left corner) in original image coordinates.
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints in original image coordinates in x, y, visible format.
+        :return: (num_keypoints=17, 3) keypoints in un-resized crop coordinate system in x, y, visible format.
+        """
+
+        # Instantiate an array for keypoints in the crop coordinates (mark all as missing with 0s for visibility).
+        keypoints_translated = np.zeros(shape=keypoints.shape, dtype=np.float32)
+
+        # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
+        keypoint_exists = keypoints[:, 2] != 0
+
+        # Copy the viable keypoints as-is (x, y, v).
+        keypoints_translated[keypoint_exists] = keypoints[keypoint_exists]
+
+        # Translate viable keypoints x, y w.r.t. crop upper left corner x1, y1 (do not touch v).
+        keypoints_translated[keypoint_exists, :2] -= box[:2]
+
+        # Return translated keypoints.
+        return keypoints_translated
+
+    @staticmethod
+    def scale_keypoints(keypoints, from_shape, to_shape):
+        """
+        Map keypoints given in crop coordinates to those of the network input, including resize and possibly distortion.
+
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints in crop coordinates in x, y, visible format.
+        :param tuple from_shape: (height, width) of the un-resized crop (crop of original image pixels).
+        :param tuple to_shape: (height, width) of the network input (resized crop).
+        :return: (num_keypoints=17, 3) keypoints in network input (resized crop) coordinates in x, y, visible format.
+        """
+
+        # Extract old and new crop width and height.
+        from_height, from_width = from_shape
+        to_height, to_width = to_shape
+
+        # Instantiate an array for keypoints in the crop coordinates (mark all as missing with 0s for visibility).
+        keypoints_scaled = np.zeros(shape=keypoints.shape, dtype=np.float32)
+
+        # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
+        keypoint_exists = keypoints[:, 2] != 0
+
+        # Copy the viable keypoints as-is (x, y, v).
+        keypoints_scaled[keypoint_exists] = keypoints[keypoint_exists]
+
+        # Rescale keypoints x, y (do not touch v).
+        keypoints_scaled[keypoint_exists, 0] *= to_width / from_width
+        keypoints_scaled[keypoint_exists, 1] *= to_height / from_height
+
+        # Return scaled keypoints.
+        return keypoints_scaled
+
 
 def main():
+
+    # Instantiate a parser and encoder.
     parser = KeypointsParser(dataset="validation")
     encoder = KeypointsEncoder(input_shape=(256, 192), output_shape=(128, 96))
 
+    # Create data generator.
     generator = (
         (cv2.imread(filename=parser.get_path(filename=filename)), np.array(box), np.array(keypoints).reshape(-1, 3))
         for filename, box, keypoints in parser.info
     )
 
     # Show each image along with its bounding boxes in sequence.
-    window_name = "keypoints"
-    for image, box, keypoints in generator:
+    window_names = ["annotation", "input"]
+    for image, box_detection, keypoints in generator:
 
-        # Draw skeleton with bounding box on the image.
-        # Skeleton.draw(image=image, keypoints=keypoints, box=box)
-        box = encoder.normalize_box(box=box, keypoints=keypoints, image_shape=image.shape[:2])
-        print(f"AR={box[2] / box[3]:.2f}, [{box[0]:.2f}, {box[1]:.2f}, {box[2]:.2f}, {box[3]:.2f}], shape={image.shape[:2]}")
-        # Drawer.draw_boxes(image=image, boxes=box[np.newaxis, :], colors=[(255, 255, 255)])
+        # Expand the detection box to get the crop box.
+        input_height, input_width = encoder.input_shape
+        aspect_ratio = input_width / input_height
+        box_crop = encoder.expand_box(box=box_detection, keypoints=keypoints, image_shape=image.shape[:2], aspect_ratio=aspect_ratio)
+        x1, y1, w, h = box_crop
+        print(f"AR={w / h:.2f}, [{x1:.1f}, {y1:.1f}, {w:.1f}, {h:.1f}], {image.shape[:2]}")
+
+        # Move keypoints and cut the crop.
+        keypoints_moved = encoder.move_keypoints(box=box_crop, keypoints=keypoints)
+        crop = image[int(y1):int(y1 + h), int(x1):int(x1 + w), ...]
+
+        # Scale keypoints and resize the crop.
+        keypoints_scaled = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop.shape[:2], to_shape=encoder.input_shape)
+        crop = cv2.resize(crop, dsize=tuple(reversed(encoder.input_shape)))  # Use opencv convention (width, height).
+
+        # Draw skeletons with bounding boxes on the image and crop.
+        Skeleton.draw(image=crop, keypoints=keypoints_scaled)
+        Skeleton.draw(image=image, keypoints=keypoints, box=box_detection)
+        Drawer.draw_boxes(image=image, boxes=box_crop[np.newaxis, :], colors=[(255, 255, 255)])
 
         # Show the image with drawn bounding boxes.
-        cv2.imshow(window_name, image)
+        cv2.imshow(window_names[0], image)
+        cv2.imshow(window_names[1], crop)
 
         # Break the loop if key 'q' was pressed.
         if cv2.waitKey() & 0xFF == ord("q"):
             break
 
-    # Close the window.
-    cv2.destroyWindow(window_name)
+    # Close the windows.
+    cv2.destroyWindow(window_names)
 
 
 if __name__ == "__main__":

@@ -96,7 +96,7 @@ class Dataset(tf.keras.utils.Sequence):
         :return tuple: images resized to class resize shape (model input shape) and bounding boxes resized accordingly.
         """
         height, width, _ = image.shape
-        boxes = DetectionsEncoder.scale(boxes=boxes, from_shape=(height, width), to_shape=Dataset.IMAGE_SHAPE)
+        boxes = DetectionsEncoder.scale_boxes(boxes=boxes, from_shape=(height, width), to_shape=Dataset.IMAGE_SHAPE)
         image = cv2.resize(image, dsize=tuple(reversed(Dataset.IMAGE_SHAPE)))  # Use opencv convention (width, height).
         return image, boxes
 

@@ -69,7 +69,7 @@ class ModelEvaluator:
                 # Resize boxes to fit the original image shape (as opposed to model output shape).
                 this_image_dict = coco_gt.loadImgs(ids=[image_id])[0]
                 this_image_shape = (this_image_dict["height"], this_image_dict["width"])
-                boxes_pred = encoder.scale(boxes_pred, from_shape=dataset.IMAGE_SHAPE, to_shape=this_image_shape)
+                boxes_pred = encoder.scale_boxes(boxes_pred, from_shape=dataset.IMAGE_SHAPE, to_shape=this_image_shape)
 
                 # Convert boxes to annotations and append to the annotations list.
                 ones = np.ones(shape=scores.shape)

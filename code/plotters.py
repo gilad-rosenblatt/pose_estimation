@@ -6,7 +6,7 @@ import numpy as np
 from pycocotools.coco import COCO
 
 from boxops import NMS
-from encoders import DetectionsEncoder
+# from encoders import DetectionsEncoder  # FIXME uncomment.
 from parsers import DetectionsParser, KeypointsParser
 
 
@@ -187,7 +187,7 @@ class Skeleton:
         """
         lines = np.empty(shape=(len(Skeleton.SKELETON), 2, 2))
         colors = []
-        keypoint_exists = np.all(keypoints != 0, axis=1)
+        keypoint_exists = keypoints[:, 2] != 0  # Visibility = 0 indicates a missing keypoint.
         index = 0
         for (start, end), color in zip(Skeleton.SKELETON, Skeleton.SKELETON_COLORS):
             if not keypoint_exists[start] or not keypoint_exists[end]:
@@ -269,10 +269,10 @@ class DetectionsPlotter:
 
             # Decode bounding boxes and extract cell center points for predictions (after NMS) and ground truth.
             boxes_true, _ = encoder.decode(this_y=this_y)
-            centers_true = encoder.get_centers(boxes=boxes_true)
+            centers_true = encoder.get_box_centers(boxes=boxes_true)
             boxes_pred, scores = encoder.decode(this_y=this_pred)
             boxes_pred, scores = NMS.perform(boxes=boxes_pred, scores=scores, threshold=nms_threshold)
-            centers_pred = encoder.get_centers(boxes=boxes_pred)
+            centers_pred = encoder.get_box_centers(boxes=boxes_pred)
 
             # Get colors for boxes based on the output grid cell their center points fall in.
             cells1 = encoder.get_cells(centers=centers_true)
