@@ -157,11 +157,81 @@ class DetectionsEncoder(DataEncoder):
 class KeypointsEncoder(DataEncoder):
     """Encoder for person keypoints in an image for a pose estimation network."""
 
-    def encode(self, *args, **kwargs):
-        raise NotImplemented
+    def encode(self, box, keypoints, image_shape):
+        """
+        Encode person keypoints corresponding to the object in the detection bounding box of an image into a heatmap.
 
-    def decode(self, *args, **kwargs):
-        raise NotImplemented
+        :param np.ndarray box: (4,) bounding box for in x1, y1, w, h format (1: upper left corner).
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format (0s for missing points).
+        :param tuple image_shape: (height, width) of the image to which all x, y coordinates refer to.
+        :return tuple: (*output_shape, num_keypoints) heatmap of Gaussian-per-keypoint in each channel.
+        """
+
+        # Expand the detection box to get the (before-resize) crop box.
+        # TODO make box estimate outside encode and take as input the translation vector.
+        input_height, input_width = self.input_shape
+        box_expanded = self.expand_box(
+            box=box,
+            keypoints=keypoints,
+            image_shape=image_shape,
+            aspect_ratio=input_width / input_height
+        )
+
+        # Move keypoints relative to expanded box upper left corner and then scale them to output grid coordinates.
+        x1, y1, w, h = box_expanded
+        output_keypoints = self.scale_keypoints(
+            keypoints=self.move_keypoints(origin=box_expanded[:2], keypoints=keypoints),  # Kps in expanded box x, y.
+            from_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1)),  # Expanded box shape.
+            to_shape=self.output_shape
+        )
+
+        # Map keypoints to a (*output_shape, num_keypoints) heatmap.
+        heatmap = self.create_heatmap(keypoints=output_keypoints, shape=self.output_shape)
+
+        # Return heatmap and the expanded detection bounding box (over the original image).
+        return heatmap, box_expanded
+
+    def decode(self, heatmap, interpolate=True):
+        """
+        Decode heatmap into keypoints in x, y, v format (v is 1 is a keypoint is detected 0 otherwise).
+
+        :param np.ndarray heatmap: (num_keypoints=17, 3) array in x, y, v format (v has a Y/N detected meaning here).
+        :param bool interpolate: if True keypoints are estimated by interpolating Gaussian centers using 2 points.
+        :return np.ndarray: (num_keypoints, 3) keypoints in input x, y, visible=0,1 format (0s for undetected points).
+        """
+
+        # Set keypoint detection threshold.
+        threshold = 1e-5
+
+        # Fill keypoints one-by-one iterating over heatmap slices.
+        keypoints = np.empty(shape=(17, 3), dtype=np.float32)
+        for keypoint_num in range(heatmap.shape[-1]):
+
+            # Take a heatmap slice for this keypoint.
+            this_heatmap = heatmap[..., keypoint_num]
+
+            # Estimate the heatmap center x, y for this channel as the keypoint location.
+            if interpolate:
+                # Estimate Gaussian center by taking a 1/4 offset from 1st to 2nd highest in x, y.
+                y, x = rows, cols = np.unravel_index(np.argpartition(this_heatmap.ravel(), -2)[-2:], this_heatmap.shape)
+                x = x[1] + (x[0] - x[1]) / 4
+                y = y[1] + (y[0] - y[1]) / 4
+                row, col = rows[1], cols[1]
+            else:
+                # Take the indices of the maximum along the heatmap per channel.
+                y, x = row, col = np.unravel_index(np.argmax(this_heatmap), this_heatmap.shape)
+
+            # Filter keypoints that do not meet a minimum score threshold in the heatmap.
+            if heatmap[row, col, keypoint_num] < threshold:
+                keypoints[keypoint_num, :] = np.array([0, 0, 0])  # v = 0 for not detected.
+            else:
+                keypoints[keypoint_num, :] = np.array([x, y, 1])  # v = 1 for detected keypoint.
+
+        # Scale/resize keypoints to input shape.
+        keypoints = self.scale_keypoints(keypoints=keypoints, from_shape=self.output_shape, to_shape=self.input_shape)
+
+        # Return decoded keypoints in coordinates of the input image.
+        return keypoints
 
     @staticmethod
     def expand_box(box, keypoints, image_shape, aspect_ratio):
@@ -250,16 +320,16 @@ class KeypointsEncoder(DataEncoder):
         return np.array([x_c - w / 2, y_c - h / 2, w, h])
 
     @staticmethod
-    def move_keypoints(box, keypoints):
+    def move_keypoints(keypoints, origin):
         """
-        Translate keypoints to coordinates of a cropped part of the image denoted by a bounding box.
+        Translate keypoints to coordinates measured with respect to new origin vector.
 
-        :param np.ndarray box: (4,) crop bounding box x1, y1, w, h (1: upper left corner) in original image coordinates.
         :param np.ndarray keypoints: (num_keypoints, 3) keypoints in original image coordinates in x, y, visible format.
-        :return: (num_keypoints=17, 3) keypoints in un-resized crop coordinate system in x, y, visible format.
+        :param np.ndarray origin: (2,) new coordinates origin for keypoints given as x, y in te same coordinates as kps.
+        :return: (num_keypoints=17, 3) keypoints in coordinate w.r.t. new origin in x, y, visible format.
         """
 
-        # Instantiate an array for keypoints in the crop coordinates (mark all as missing with 0s for visibility).
+        # Instantiate an array for keypoints in shifted coordinates (mark all as missing with 0s for visibility).
         keypoints_translated = np.zeros(shape=keypoints.shape, dtype=np.float32)
 
         # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
@@ -268,8 +338,8 @@ class KeypointsEncoder(DataEncoder):
         # Copy the viable keypoints as-is (x, y, v).
         keypoints_translated[is_keypoint] = keypoints[is_keypoint]
 
-        # Translate viable keypoints x, y w.r.t. crop upper left corner x1, y1 (do not touch v).
-        keypoints_translated[is_keypoint, :2] -= box[:2]
+        # Translate viable keypoints x, y to be w.r.t. to new origin x, y (do not touch v).
+        keypoints_translated[is_keypoint, :2] -= origin
 
         # Return translated keypoints.
         return keypoints_translated
@@ -307,6 +377,13 @@ class KeypointsEncoder(DataEncoder):
 
     @staticmethod
     def create_heatmap(keypoints, shape):
+        """
+        Encode person keypoints given in coordinates corresponding to an image of given shape into a heatmap.
+
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format (0s for missing points).
+        :param tuple shape: (height, width) of the image/grid to which keypoint x, y coordinates refer to.
+        :return np.ndarray: (*output_shape, num_keypoints) heatmap of Gaussian-per-keypoint in each channel.
+        """
 
         # Instantiate a heatmap to all zeros (for missing keypoints).
         heatmap = np.zeros(shape=(*shape, 17), dtype=np.float32)  # TODO define Skeleton.NUM_KEYPOINTS?
@@ -322,11 +399,13 @@ class KeypointsEncoder(DataEncoder):
             np.linspace(0, height, height, endpoint=True)
         )
 
-        # Build a keypoint-centered Gaussian heatmap over the pixel grid where each keypoint is given a channel.
+        # Define Gaussian standard deviation per keypoint channel.
         # sigma = height * np.array([  # TODO define Skeleton.SIGMAS? Use them here?
         #     .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07, .87, .87, .89, .89
         # ])[is_keypoint][np.newaxis, np.newaxis, :] / 10
         sigma = 3
+
+        # Build a keypoint-centered Gaussian heatmap over the pixel grid where each keypoint is given a channel.
         x_kps = viable_keypoints[:, 0]
         y_kps = viable_keypoints[:, 1]
         heatmap[..., is_keypoint] = np.exp(
@@ -334,7 +413,7 @@ class KeypointsEncoder(DataEncoder):
             - ((((y[..., np.newaxis] - y_kps[np.newaxis, np.newaxis, :]) / sigma) ** 2) / 2)
         )
 
-        # Return 1-per-keypoint heatmap.
+        # Return 1-channel-per-keypoint heatmap.
         return heatmap
 
 
@@ -355,14 +434,12 @@ def main():
     for image, box_detection, keypoints in generator:
 
         # Expand the detection box to get the crop box.
-        input_height, input_width = encoder.input_shape
-        aspect_ratio = input_width / input_height
-        box_crop = encoder.expand_box(box=box_detection, keypoints=keypoints, image_shape=image.shape[:2], aspect_ratio=aspect_ratio)
+        heatmap, box_crop = encoder.encode(box=box_detection, keypoints=keypoints, image_shape=image.shape[:2])
         x1, y1, w, h = box_crop
         print(f"AR={w / h:.2f}, [{x1:.1f}, {y1:.1f}, {w:.1f}, {h:.1f}], {image.shape[:2]}")
 
         # Move keypoints and cut the crop.
-        keypoints_moved = encoder.move_keypoints(box=box_crop, keypoints=keypoints)
+        keypoints_moved = encoder.move_keypoints(origin=box_crop[:2], keypoints=keypoints)
         crop = image[int(y1):int(y1 + h), int(x1):int(x1 + w), ...]
         crop_shape = crop.shape[:2]
 
@@ -389,12 +466,19 @@ def main():
         if cv2.waitKey() & 0xFF == ord("q"):
             break
 
-        # Calculate the output crop heatmap.
-        heatmap = encoder.create_heatmap(keypoints=keypoints_output, shape=encoder.output_shape)
+        # Show the output crop heatmap and the encoded and decoded keypoints.
         plt.figure()
         plt.imshow(cv2.cvtColor(crop_output, cv2.COLOR_BGRA2RGB))
         plt.imshow(heatmap.sum(axis=-1), alpha=0.7, interpolation="bilinear", cmap=plt.cm.get_cmap("viridis"))
         plt.show()
+
+        # Check decode method.
+        keypoints_decoded = encoder.decode(heatmap=heatmap, interpolate=True)
+        is_keypoint_decoded = keypoints_decoded[:, 2] != 0
+        is_keypoint_scaled = keypoints_scaled[:, 2] != 0
+        print("Number of keypoints:", is_keypoint_decoded.sum(), is_keypoint_scaled.sum())
+        print("Mean L2 error: ", np.mean(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_scaled[:, :2], axis=-1)))
+        print("Max L2 error: ", np.max(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_scaled[:, :2], axis=-1)))
 
     # Close the windows.
     for window_name in window_names:
