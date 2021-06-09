@@ -6,7 +6,7 @@ import numpy as np
 from pycocotools.coco import COCO
 
 from boxops import NMS
-# from encoders import DetectionsEncoder  # FIXME uncomment.
+from encoders import DetectionsEncoder
 from parsers import DetectionsParser, KeypointsParser
 
 
