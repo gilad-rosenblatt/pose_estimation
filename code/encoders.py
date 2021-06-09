@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 from parsers import KeypointsParser
 from plotters import Skeleton, Drawer
@@ -262,13 +263,13 @@ class KeypointsEncoder(DataEncoder):
         keypoints_translated = np.zeros(shape=keypoints.shape, dtype=np.float32)
 
         # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
-        keypoint_exists = keypoints[:, 2] != 0
+        is_keypoint = keypoints[:, 2] != 0
 
         # Copy the viable keypoints as-is (x, y, v).
-        keypoints_translated[keypoint_exists] = keypoints[keypoint_exists]
+        keypoints_translated[is_keypoint] = keypoints[is_keypoint]
 
         # Translate viable keypoints x, y w.r.t. crop upper left corner x1, y1 (do not touch v).
-        keypoints_translated[keypoint_exists, :2] -= box[:2]
+        keypoints_translated[is_keypoint, :2] -= box[:2]
 
         # Return translated keypoints.
         return keypoints_translated
@@ -292,17 +293,49 @@ class KeypointsEncoder(DataEncoder):
         keypoints_scaled = np.zeros(shape=keypoints.shape, dtype=np.float32)
 
         # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
-        keypoint_exists = keypoints[:, 2] != 0
+        is_keypoint = keypoints[:, 2] != 0
 
         # Copy the viable keypoints as-is (x, y, v).
-        keypoints_scaled[keypoint_exists] = keypoints[keypoint_exists]
+        keypoints_scaled[is_keypoint] = keypoints[is_keypoint]
 
         # Rescale keypoints x, y (do not touch v).
-        keypoints_scaled[keypoint_exists, 0] *= to_width / from_width
-        keypoints_scaled[keypoint_exists, 1] *= to_height / from_height
+        keypoints_scaled[is_keypoint, 0] *= to_width / from_width
+        keypoints_scaled[is_keypoint, 1] *= to_height / from_height
 
         # Return scaled keypoints.
         return keypoints_scaled
+
+    @staticmethod
+    def create_heatmap(keypoints, shape):
+
+        # Instantiate a heatmap to all zeros (for missing keypoints).
+        heatmap = np.zeros(shape=(*shape, 17), dtype=np.float32)  # TODO define Skeleton.NUM_KEYPOINTS?
+
+        # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
+        is_keypoint = keypoints[:, 2] != 0
+        viable_keypoints = keypoints[is_keypoint]
+
+        # Define a mesh grid over pixel coordinate.
+        height, width = shape
+        x, y = np.meshgrid(
+            np.linspace(0, width, width, endpoint=True),
+            np.linspace(0, height, height, endpoint=True)
+        )
+
+        # Build a keypoint-centered Gaussian heatmap over the pixel grid where each keypoint is given a channel.
+        # sigma = height * np.array([  # TODO define Skeleton.SIGMAS? Use them here?
+        #     .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07, .87, .87, .89, .89
+        # ])[is_keypoint][np.newaxis, np.newaxis, :] / 10
+        sigma = 3
+        x_kps = viable_keypoints[:, 0]
+        y_kps = viable_keypoints[:, 1]
+        heatmap[..., is_keypoint] = np.exp(
+            - ((((x[..., np.newaxis] - x_kps[np.newaxis, np.newaxis, :]) / sigma) ** 2) / 2)
+            - ((((y[..., np.newaxis] - y_kps[np.newaxis, np.newaxis, :]) / sigma) ** 2) / 2)
+        )
+
+        # Return 1-per-keypoint heatmap.
+        return heatmap
 
 
 def main():
@@ -318,7 +351,7 @@ def main():
     )
 
     # Show each image along with its bounding boxes in sequence.
-    window_names = ["annotation", "input"]
+    window_names = ["annotation", "input", "output"]
     for image, box_detection, keypoints in generator:
 
         # Expand the detection box to get the crop box.
@@ -331,26 +364,41 @@ def main():
         # Move keypoints and cut the crop.
         keypoints_moved = encoder.move_keypoints(box=box_crop, keypoints=keypoints)
         crop = image[int(y1):int(y1 + h), int(x1):int(x1 + w), ...]
+        crop_shape = crop.shape[:2]
 
-        # Scale keypoints and resize the crop.
-        keypoints_scaled = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop.shape[:2], to_shape=encoder.input_shape)
-        crop = cv2.resize(crop, dsize=tuple(reversed(encoder.input_shape)))  # Use opencv convention (width, height).
+        # Scale keypoints and resize the crop to input shape.
+        keypoints_scaled = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop_shape, to_shape=encoder.input_shape)
+        crop_scaled = cv2.resize(crop, dsize=tuple(reversed(encoder.input_shape)))  # Opencv convention (w, h).
+
+        # Scale keypoints and resize the crop to output shape.
+        keypoints_output = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop_shape, to_shape=encoder.output_shape)
+        crop_output = cv2.resize(crop, dsize=tuple(reversed(encoder.output_shape)))  # Opencv convention (w, h).
 
         # Draw skeletons with bounding boxes on the image and crop.
-        Skeleton.draw(image=crop, keypoints=keypoints_scaled)
+        Skeleton.draw(image=crop_scaled, keypoints=keypoints_scaled)
+        Skeleton.draw(image=crop_output, keypoints=keypoints_output)
         Skeleton.draw(image=image, keypoints=keypoints, box=box_detection)
         Drawer.draw_boxes(image=image, boxes=box_crop[np.newaxis, :], colors=[(255, 255, 255)])
 
         # Show the image with drawn bounding boxes.
         cv2.imshow(window_names[0], image)
-        cv2.imshow(window_names[1], crop)
+        cv2.imshow(window_names[1], crop_scaled)
+        cv2.imshow(window_names[2], crop_output)
 
         # Break the loop if key 'q' was pressed.
         if cv2.waitKey() & 0xFF == ord("q"):
             break
 
+        # Calculate the output crop heatmap.
+        heatmap = encoder.create_heatmap(keypoints=keypoints_output, shape=encoder.output_shape)
+        plt.figure()
+        plt.imshow(cv2.cvtColor(crop_output, cv2.COLOR_BGRA2RGB))
+        plt.imshow(heatmap.sum(axis=-1), alpha=0.7, interpolation="bilinear", cmap=plt.cm.get_cmap("viridis"))
+        plt.show()
+
     # Close the windows.
-    cv2.destroyWindow(window_names)
+    for window_name in window_names:
+        cv2.destroyWindow(window_name)
 
 
 if __name__ == "__main__":
