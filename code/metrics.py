@@ -8,7 +8,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
 from boxops import NMS
-from datasets import Dataset
+from datasets import DetectionsDataset
 from encoders import DetectionsEncoder
 from plotters import DetectionsPlotter
 from parsers import DetectionsParser
@@ -40,14 +40,14 @@ class ModelEvaluator:
         """
 
         # Load dataset and and COCO API object.
-        dataset = Dataset(batch_size=64, dataset=self.dataset, generate_image_ids=True)
+        dataset = DetectionsDataset(batch_size=64, dataset=self.dataset, generate_image_ids=True)
         coco_gt = COCO(annotation_file=DetectionsParser.get_annotation_file(dataset=self.dataset))
 
         # Load model.
         model = tf.keras.models.load_model(os.path.join(ModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
 
         # Initialize encoder (model output <--> boxes and scores).
-        encoder = DetectionsEncoder(input_shape=dataset.IMAGE_SHAPE, output_shape=dataset.CELLS_SHAPE)
+        encoder = DetectionsEncoder(input_shape=dataset.INPUT_SHAPE, output_shape=dataset.OUTPUT_SHAPE)
 
         # Initialize the list of annotations (detections).
         annotations = []
@@ -69,7 +69,7 @@ class ModelEvaluator:
                 # Resize boxes to fit the original image shape (as opposed to model output shape).
                 this_image_dict = coco_gt.loadImgs(ids=[image_id])[0]
                 this_image_shape = (this_image_dict["height"], this_image_dict["width"])
-                boxes_pred = encoder.scale_boxes(boxes_pred, from_shape=dataset.IMAGE_SHAPE, to_shape=this_image_shape)
+                boxes_pred = encoder.scale_boxes(boxes_pred, from_shape=dataset.INPUT_SHAPE, to_shape=this_image_shape)
 
                 # Convert boxes to annotations and append to the annotations list.
                 ones = np.ones(shape=scores.shape)

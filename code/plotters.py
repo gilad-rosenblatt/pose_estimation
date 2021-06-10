@@ -209,7 +209,7 @@ class Skeleton:
         """
         if isinstance(box, np.ndarray):
             yellow = (0, 204, 204)
-            Drawer.draw_boxes(image=image, boxes=np.array(box)[np.newaxis, :], colors=[yellow])
+            Drawer.draw_boxes(image=image, boxes=box[np.newaxis, :], colors=[yellow])
         lines, colors = Skeleton._make_lines(keypoints=keypoints)
         Drawer.draw_lines(image=image, lines=lines, colors=colors, mark_endpoints=True)
 
@@ -367,7 +367,11 @@ if __name__ == "__main__":
 
     # Creates generator that loads each image in sequence and instantiate a numpy array for its keypoints and boxes.
     generator = (
-        (cv2.imread(filename=parser.get_path(filename=filename)), box, np.array(keypoints).reshape(-1, 3))
+        (
+            cv2.imread(filename=parser.get_path(filename=filename)),
+            np.array(box, dtype=np.float32 ),
+            np.array(keypoints, dtype=np.float32).reshape(-1, 3)
+        )
         for filename, box, keypoints in parser.info
     )
 

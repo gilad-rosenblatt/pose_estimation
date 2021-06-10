@@ -3,13 +3,13 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from datasets import Dataset
+from datasets import DetectionsDataset
 from plotters import DetectionsPlotter
 
 
 def main():
     # Load dataset and get first batch.
-    ds_validation = Dataset(batch_size=64, dataset="validation")
+    ds_validation = DetectionsDataset(batch_size=64, dataset="validation")
     x, y_true = ds_validation[0]
 
     # Define models to show.

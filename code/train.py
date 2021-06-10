@@ -3,7 +3,7 @@ from time import time
 import tensorflow as tf
 from tensorflow.python.keras.callbacks import TensorBoard
 
-from datasets import Dataset
+from datasets import DetectionsDataset
 from losses import DetectionLoss
 from models import get_model
 
@@ -11,8 +11,8 @@ from models import get_model
 def main():
     # Load dataset generators.
     batch_size = 64
-    ds_train = Dataset(batch_size=batch_size, dataset="train")
-    ds_validation = Dataset(batch_size=batch_size, dataset="validation")
+    ds_train = DetectionsDataset(batch_size=batch_size, dataset="train")
+    ds_validation = DetectionsDataset(batch_size=batch_size, dataset="validation")
 
     # Get Model.
     model = get_model(batch_normalization=True, activation="leaky_relu", dropout=True)

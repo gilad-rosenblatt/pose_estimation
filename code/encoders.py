@@ -4,7 +4,7 @@ import numpy as np
 
 
 class DataEncoder(ABC):
-    """Encoder annotations data in an image for a convolutional neural network."""
+    """Encoder for annotations data in an image for a convolutional neural network."""
 
     def __init__(self, input_shape, output_shape):
         """
@@ -152,41 +152,28 @@ class DetectionsEncoder(DataEncoder):
 class KeypointsEncoder(DataEncoder):
     """Encoder for person keypoints in an image for a pose estimation network."""
 
-    def encode(self, box, keypoints, image_shape):
+    def encode(self, keypoints):
         """
         Encode person keypoints corresponding to the object in the detection bounding box of an image into a heatmap.
 
-        :param np.ndarray box: (4,) bounding box for in x1, y1, w, h format (1: upper left corner).
         :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format (0s for missing points).
-        :param tuple image_shape: (height, width) of the image to which all x, y coordinates refer to.
         :return tuple: (*output_shape, num_keypoints) heatmap of Gaussian-per-keypoint in each channel.
         """
 
-        # Expand the detection box to get the (before-resize) crop box.
-        # TODO make box estimate outside encode and take as input the translation vector.
-        input_height, input_width = self.input_shape
-        box_expanded = self.expand_box(
-            box=box,
-            keypoints=keypoints,
-            image_shape=image_shape,
-            aspect_ratio=input_width / input_height
-        )
-
-        # Move keypoints relative to expanded box upper left corner and then scale them to output grid coordinates.
-        x1, y1, w, h = box_expanded
+        # Scale keypoints to output grid coordinates.
         output_keypoints = self.scale_keypoints(
-            keypoints=self.move_keypoints(origin=box_expanded[:2], keypoints=keypoints),  # Kps in expanded box x, y.
-            from_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1)),  # Expanded box shape.
+            keypoints=keypoints,
+            from_shape=self.input_shape,
             to_shape=self.output_shape
         )
 
         # Map keypoints to a (*output_shape, num_keypoints) heatmap.
         heatmap = self.create_heatmap(keypoints=output_keypoints, shape=self.output_shape)
 
-        # Return heatmap and the expanded detection bounding box (over the original image).
-        return heatmap, box_expanded
+        # Return heatmap.
+        return heatmap
 
-    def decode(self, heatmap, interpolate=True):
+    def decode(self, heatmap, interpolate=False):
         """
         Decode heatmap into keypoints in x, y, v format (v is 1 is a keypoint is detected 0 otherwise).
 
@@ -223,7 +210,11 @@ class KeypointsEncoder(DataEncoder):
                 keypoints[keypoint_num, :] = np.array([x, y, 1])  # v = 1 for detected keypoint.
 
         # Scale/resize keypoints to input shape.
-        keypoints = self.scale_keypoints(keypoints=keypoints, from_shape=self.output_shape, to_shape=self.input_shape)
+        keypoints = self.scale_keypoints(
+            keypoints=keypoints,
+            from_shape=self.output_shape,
+            to_shape=self.input_shape
+        )
 
         # Return decoded keypoints in coordinates of the input image.
         return keypoints
@@ -371,12 +362,13 @@ class KeypointsEncoder(DataEncoder):
         return keypoints_scaled
 
     @staticmethod
-    def create_heatmap(keypoints, shape):
+    def create_heatmap(keypoints, shape, uniform_sigma=True):
         """
         Encode person keypoints given in coordinates corresponding to an image of given shape into a heatmap.
 
         :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format (0s for missing points).
         :param tuple shape: (height, width) of the image/grid to which keypoint x, y coordinates refer to.
+        :param uniform_sigma: if True the heatmap variance for each keypoint is the same (otherwise use COCO sigmas).
         :return np.ndarray: (*output_shape, num_keypoints) heatmap of Gaussian-per-keypoint in each channel.
         """
 
@@ -395,10 +387,12 @@ class KeypointsEncoder(DataEncoder):
         )
 
         # Define Gaussian standard deviation per keypoint channel.
-        # sigma = height * np.array([  # TODO define Skeleton.SIGMAS? Use them here?
-        #     .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07, .87, .87, .89, .89
-        # ])[is_keypoint][np.newaxis, np.newaxis, :] / 10
-        sigma = 3
+        if not uniform_sigma:
+            sigma = height * np.array([  # TODO define Skeleton.SIGMAS? Use them here?
+                .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07, .87, .87, .89, .89
+            ])[is_keypoint][np.newaxis, np.newaxis, :] / 10
+        else:
+            sigma = float(height // 32)  # 1 pixel in standard deviation for each 32 pixels in output space.
 
         # Build a keypoint-centered Gaussian heatmap over the pixel grid where each keypoint is given a channel.
         x_kps = viable_keypoints[:, 0]

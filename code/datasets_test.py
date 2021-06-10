@@ -1,7 +1,7 @@
 import unittest
 import cv2
 import numpy as np
-from datasets import Dataset
+from datasets import DetectionsDataset
 
 
 class TestDataset(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestDataset(unittest.TestCase):
         """Test that decoding encoded boxes for a batch yields the original (scaled) box annotations for that batch."""
 
         # Load dataset generator object.
-        dataset = Dataset(batch_size=64, dataset="validation")
+        dataset = DetectionsDataset(batch_size=64, dataset="validation")
 
         # Select index of the batch to test.
         batch_index = 0

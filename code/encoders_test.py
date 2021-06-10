@@ -15,7 +15,11 @@ def main():
 
     # Create data generator.
     generator = (
-        (cv2.imread(filename=parser.get_path(filename=filename)), np.array(box), np.array(keypoints).reshape(-1, 3))
+        (
+            cv2.imread(filename=parser.get_path(filename=filename)),
+            np.array(box, dtype=np.float32),
+            np.array(keypoints, dtype=np.float32).reshape(-1, 3)
+        )
         for filename, box, keypoints in parser.info
     )
 
@@ -23,33 +27,51 @@ def main():
     window_names = ["annotation", "input", "output"]
     for image, box_detection, keypoints in generator:
 
-        # Expand the detection box to get the crop box.
-        heatmap, box_crop = encoder.encode(box=box_detection, keypoints=keypoints, image_shape=image.shape[:2])
-        x1, y1, w, h = box_crop
+        # Expand detection box to get crop box.
+        input_height, input_width = encoder.input_shape
+        x1, y1, w, h = box_expanded = KeypointsEncoder.expand_box(
+            box=box_detection,
+            keypoints=keypoints,
+            image_shape=image.shape[:2],
+            aspect_ratio=input_width / input_height
+        )
         print(f"AR={w / h:.2f}, [{x1:.1f}, {y1:.1f}, {w:.1f}, {h:.1f}], {image.shape[:2]}")
 
-        # Move keypoints and cut the crop.
-        keypoints_moved = encoder.move_keypoints(origin=box_crop[:2], keypoints=keypoints)
+        # Cut the crop and move keypoints to crop coordinates.
         crop = image[int(y1):int(y1 + h), int(x1):int(x1 + w), ...]
-        crop_shape = crop.shape[:2]
+        keypoints_moved = KeypointsEncoder.move_keypoints(
+            origin=np.array([int(x1), int(y1)], dtype=np.float32),
+            keypoints=keypoints
+        )
 
-        # Scale keypoints and resize the crop to input shape.
-        keypoints_scaled = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop_shape, to_shape=encoder.input_shape)
-        crop_scaled = cv2.resize(crop, dsize=tuple(reversed(encoder.input_shape)))  # Opencv convention (w, h).
+        # Scale keypoints and resize the crop to input shape (can distort in edge case).
+        crop_input = cv2.resize(crop, dsize=tuple(reversed(encoder.input_shape)))  # Use opencv convention (w, h).
+        keypoints_input = KeypointsEncoder.scale_keypoints(
+            keypoints=keypoints_moved,  # Keypoints in crop (expanded box) x, y.
+            from_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1)),  # Expanded box shape.
+            to_shape=encoder.input_shape
+        )
+
+        # Encode keypoints into heatmap.
+        heatmap = encoder.encode(keypoints=keypoints_input)
 
         # Scale keypoints and resize the crop to output shape.
-        keypoints_output = encoder.scale_keypoints(keypoints=keypoints_moved, from_shape=crop_shape, to_shape=encoder.output_shape)
         crop_output = cv2.resize(crop, dsize=tuple(reversed(encoder.output_shape)))  # Opencv convention (w, h).
+        keypoints_output = encoder.scale_keypoints(
+            keypoints=keypoints_input,
+            from_shape=encoder.input_shape,
+            to_shape=encoder.output_shape
+        )
 
         # Draw skeletons with bounding boxes on the image and crop.
-        Skeleton.draw(image=crop_scaled, keypoints=keypoints_scaled)
+        Skeleton.draw(image=crop_input, keypoints=keypoints_input)
         Skeleton.draw(image=crop_output, keypoints=keypoints_output)
         Skeleton.draw(image=image, keypoints=keypoints, box=box_detection)
-        Drawer.draw_boxes(image=image, boxes=box_crop[np.newaxis, :], colors=[(255, 255, 255)])
+        Drawer.draw_boxes(image=image, boxes=box_expanded[np.newaxis, :], colors=[(255, 255, 255)])
 
         # Show the image with drawn bounding boxes.
         cv2.imshow(window_names[0], image)
-        cv2.imshow(window_names[1], crop_scaled)
+        cv2.imshow(window_names[1], crop_input)
         cv2.imshow(window_names[2], crop_output)
 
         # Break the loop if key 'q' was pressed.
@@ -65,10 +87,10 @@ def main():
         # Check decode method.
         keypoints_decoded = encoder.decode(heatmap=heatmap, interpolate=True)
         is_keypoint_decoded = keypoints_decoded[:, 2] != 0
-        is_keypoint_scaled = keypoints_scaled[:, 2] != 0
+        is_keypoint_scaled = keypoints_input[:, 2] != 0
         print("Number of keypoints:", is_keypoint_decoded.sum(), is_keypoint_scaled.sum())
-        print("Mean L2 error: ", np.mean(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_scaled[:, :2], axis=-1)))
-        print("Max L2 error: ", np.max(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_scaled[:, :2], axis=-1)))
+        print("Mean L2 error: ", np.mean(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_input[:, :2], axis=-1)))
+        print("Max L2 error: ", np.max(np.linalg.norm(keypoints_decoded[:, :2] - keypoints_input[:, :2], axis=-1)))
 
     # Close the windows.
     for window_name in window_names:
