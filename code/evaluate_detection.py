@@ -27,7 +27,7 @@ def main():
     # About compile=False: <https://stackoverflow.com/questions/60530304/loading-custom-model-with-tensorflow-2-1>.
     cls_threshold = 0.8
     nms_threshold = 0.3
-    models_dir = "../models"
+    models_dir = os.path.join("..", "models", "detection")
     for stage, filename in filenames.items():
         print(f"Loading {stage}...")
         model = tf.keras.models.load_model(os.path.join(models_dir, filename), compile=False)

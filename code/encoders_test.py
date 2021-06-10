@@ -11,7 +11,7 @@ def main():
 
     # Instantiate a parser and encoder.
     parser = KeypointsParser(dataset="validation")
-    encoder = KeypointsEncoder(input_shape=(256, 192), output_shape=(128, 96))
+    encoder = KeypointsEncoder(input_shape=(256, 192), output_shape=(64, 48))
 
     # Create data generator.
     generator = (

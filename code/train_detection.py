@@ -1,3 +1,4 @@
+import os
 from time import time
 
 import tensorflow as tf
@@ -40,7 +41,7 @@ def main():
 
     # Create callback to save model weights every epoch and reduce learning rate on plateau.
     save_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath="../training/cp-{epoch:03d}.ckpt",
+        filepath=os.path.join("..", "training", "detection", "cp-{epoch:03d}.ckpt"),
         verbose=1,
         save_weights_only=True,
         save_best_only=True  # Latest checkpoint should be best.
@@ -51,7 +52,7 @@ def main():
         patience=5,
         min_lr=learning_rate / 100
     )
-    tensorboard = TensorBoard(f"../logs/{time()}")
+    tensorboard = TensorBoard(os.path.join("..", "logs", f"{time()}"))
     callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
 
     # Train the model w/callbacks.
@@ -64,7 +65,7 @@ def main():
     )
 
     # Save the model.
-    model_path = "../models/my_model"
+    model_path = os.path.join("..", "models", "detection", "my_model")
     model.save(
         f"{model_path}_"
         f"tim{time()}_"
