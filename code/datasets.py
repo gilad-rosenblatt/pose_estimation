@@ -177,7 +177,7 @@ class KeypointsDataset(Dataset):
     INPUT_SHAPE = (256, 192)
 
     # Output heatmap shape without channels (height, width).
-    OUTPUT_SHAPE = (128, 96)
+    OUTPUT_SHAPE = (64, 48)
 
     def __getitem__(self, batch_index):
         """

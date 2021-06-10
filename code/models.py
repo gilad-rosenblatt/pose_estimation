@@ -57,7 +57,7 @@ def get_keypoints_detection_model(batch_normalization=False, activation="relu", 
     def decoder_block(x, filters):
         x = tf.keras.layers.Conv2DTranspose(filters=filters, kernel_size=4, strides=2, padding="same")(x)  # No act.
         x = tf.keras.layers.BatchNormalization()(x) if batch_normalization else x
-        return tf.keras.layers.ReLU()(x) if activation == "relu" else tf.keras.layers.LeakyReLU(alpha=0.1)(x)
+        return tf.keras.layers.ReLU()(x)
 
     # Define the model encoder (detection backbone).
     x = inputs = tf.keras.layers.Input(shape=(None, None, 3))
