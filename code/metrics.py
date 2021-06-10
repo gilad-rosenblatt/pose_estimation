@@ -18,8 +18,8 @@ class ModelEvaluator:
     """Evaluator for calculating mAP scores on object detection models trained on COCO."""
 
     # Saved models and score files parent directories.
-    MODELS_DIR = "../models"  # TODO this should be stored somewhere else.
-    SCORES_DIR = "../scores"
+    MODELS_DIR = os.path.join("..", "models", "detection")  # TODO this should be stored somewhere else.
+    SCORES_DIR = os.path.join("..", "scores", "detection")
 
     def __init__(self, model_filename, dataset="validation"):
         """

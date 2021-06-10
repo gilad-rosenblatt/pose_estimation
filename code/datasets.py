@@ -202,7 +202,7 @@ class KeypointsDataset(Dataset):
             keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 3)
 
             # Crop and resize image to input shape and move/rescale keypoints to input coordinates.
-            this_image, boxes = self._resize(image=this_image, box=box, keypoints=keypoints)
+            this_image, keypoints = self._resize(image=this_image, box=box, keypoints=keypoints)
 
             # Normalize input image to 0-1.
             this_x = this_image / 255

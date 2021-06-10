@@ -6,7 +6,7 @@ import numpy as np
 from pycocotools.coco import COCO
 
 from boxops import NMS
-from encoders import DetectionsEncoder
+from encoders import DetectionsEncoder, KeypointsEncoder
 from parsers import DetectionsParser, KeypointsParser
 
 
@@ -247,18 +247,18 @@ class DetectionsPlotter:
         """
         Show the batch ground truth and predictions image by image.
 
-        :param np.nd.array x: a (batch_size, *image_shape, 3) array of normalized (values in 0-1) images.
-        :param np.nd.array y_true: (batch_size, *cells_shape, 5) ground-truth encoding bounding boxes and 0/1 scores.
-        :param np.nd.array y_pred: (batch_size, *cells_shape, 5) model output encoding bounding boxes and scores.
+        :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
+        :param np.nd.array y_true: (batch_size, *output_shape, 5) ground-truth encoded bounding boxes and 0/1 scores.
+        :param np.nd.array y_pred: (batch_size, *output_shape, 5) model predicted encoded bounding boxes and scores.
         :param float nms_threshold: threshold used for non-max suppression when post processing the prediction boxes.
         """
 
         # Get input and output dimensions.
-        _, *image_shape, _ = x.shape
-        _, *cells_shape, _ = y_true.shape
+        _, *input_shape, _ = x.shape
+        _, *output_shape, _ = y_true.shape
 
         # Initialize encoder.
-        encoder = DetectionsEncoder(input_shape=image_shape, output_shape=cells_shape)
+        encoder = DetectionsEncoder(input_shape=input_shape, output_shape=output_shape)
 
         # Show ground-truth and predictions for each image in sequence.
         window_name = "annotation_boxes"
@@ -277,8 +277,8 @@ class DetectionsPlotter:
             # Get colors for boxes based on the output grid cell their center points fall in.
             cells1 = encoder.get_cells(centers=centers_true)
             cells2 = encoder.get_cells(centers=centers_pred)
-            colors1 = [Drawer.get_color(index=index) for index in np.ravel_multi_index(cells1.T, dims=cells_shape)]
-            colors2 = [Drawer.get_color(index=index) for index in np.ravel_multi_index(cells2.T, dims=cells_shape)]
+            colors1 = [Drawer.get_color(index=index) for index in np.ravel_multi_index(cells1.T, dims=output_shape)]
+            colors2 = [Drawer.get_color(index=index) for index in np.ravel_multi_index(cells2.T, dims=output_shape)]
 
             # Draw bounding boxes and box center circles.
             Drawer.draw_boxes(image=image, boxes=boxes_true, colors=colors1, thickness=1)
@@ -351,6 +351,61 @@ class KeypointsPlotter:
 
             # Show the image with drawn bounding boxes.
             cv2.imshow(window_name, image)
+
+            # Break the loop if key 'q' was pressed.
+            if cv2.waitKey() & 0xFF == ord("q"):
+                break
+
+        # Close the window.
+        cv2.destroyWindow(window_name)
+
+    @staticmethod
+    def show_batch(x, y_true, y_pred):
+        """
+        Show side-by-side the batch ground truth and predictions image by image.
+
+        :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
+        :param np.nd.array y_true: (batch_size, *output_shape, 17) ground-truth heatmap-encoded keypoints.
+        :param np.nd.array y_pred: (batch_size, *output_shape, 17) model predicted heatmap-encoded keypoints.
+        """
+
+        # Get input and output dimensions.
+        _, *input_shape, _ = x.shape
+        _, *output_shape, _ = y_true.shape
+
+        # Initialize encoder.
+        encoder = KeypointsEncoder(input_shape=input_shape, output_shape=output_shape)
+
+        # Show ground-truth and predictions for each image in sequence.
+        window_name = "annotation_keypoints"
+        for this_x, this_y, this_pred in zip(x, y_true, y_pred):
+
+            # Cast image to uint8.
+            image = (this_x * 255).astype(np.uint8)
+            image_copy = image.copy()
+
+            # Decode keypoints for predictions and ground truth.
+            keypoints = encoder.decode(heatmap=this_y)
+            keypoints_pred = encoder.decode(heatmap=this_pred)
+
+            # Scale keypoints to from output to input shape.
+            keypoints = encoder.scale_keypoints(
+                keypoints=keypoints,
+                from_shape=encoder.output_shape,
+                to_shape=encoder.input_shape
+            )
+            keypoints_pred = encoder.scale_keypoints(
+                keypoints=keypoints_pred,
+                from_shape=encoder.output_shape,
+                to_shape=encoder.input_shape
+            )
+
+            # Draw skeletons on the image.
+            Skeleton.draw(image=image, keypoints=keypoints)
+            Skeleton.draw(image=image_copy, keypoints=keypoints_pred)
+
+            # Show the image with drawn bounding boxes and circles.
+            cv2.imshow(window_name, np.hstack((image, image_copy)))
 
             # Break the loop if key 'q' was pressed.
             if cv2.waitKey() & 0xFF == ord("q"):
