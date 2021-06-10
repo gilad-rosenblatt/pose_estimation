@@ -173,6 +173,9 @@ class DetectionsDataset(Dataset):
 class KeypointsDataset(Dataset):
     """Generator of image batches and their ground truth keypoints encoded as heatmaps for pose estimation."""
 
+    # List of keypoint to include in the dataset (denoted by 0-16 indices).
+    KEYPOINTS = list(range(17))
+
     # Input image shape without channels (height, width).
     INPUT_SHAPE = (256, 192)
 
@@ -184,14 +187,15 @@ class KeypointsDataset(Dataset):
         Generate one batch of data corresponding to the input batch index. Does not raise IndexError (a tf.Sequence).
 
         :param int batch_index: index of the batch to get.
-        :return tuple: x of shape (batch_size, *INPUT_SHAPE, 3) and y of shape (batch_size, *OUTPUT_SHAPE, 17).
+        :return tuple: x of shape (batch_size, *INPUT_SHAPE, 3) and y of shape (batch_size, *OUTPUT_SHAPE, #keypoints).
         """
+
         # Get file paths and keypoint annotations for this batch.
         batch_info = super().__getitem__(batch_index=batch_index)
 
         # Initialize input and output arrays (take batch size from indices since last batch can be smaller).
         x = np.empty(shape=(len(batch_info), *KeypointsDataset.INPUT_SHAPE, 3), dtype=np.float32)
-        y = np.empty(shape=(len(batch_info), *KeypointsDataset.OUTPUT_SHAPE, 17), dtype=np.float32)
+        y = np.empty(shape=(len(batch_info), *KeypointsDataset.OUTPUT_SHAPE, len(self.KEYPOINTS)), dtype=np.float32)
 
         # Fill input and output arrays image-by-image. Does not raise IndexError (last batch check done by tf.Sequence).
         for index, (filename, box, keypoints) in enumerate(batch_info):
@@ -199,7 +203,7 @@ class KeypointsDataset(Dataset):
             # Load the image and instantiate numpy arrays for the detection box and keypoints (one per row).
             this_image = cv2.imread(self._parser.get_path(filename))
             box = np.array(box, dtype=np.float32)
-            keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 3)
+            keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 3)[np.array(self.KEYPOINTS)]
 
             # Crop and resize image to input shape and move/rescale keypoints to input coordinates.
             this_image, keypoints = self._resize(image=this_image, box=box, keypoints=keypoints)

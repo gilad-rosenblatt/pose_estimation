@@ -6,6 +6,7 @@ from tensorflow.python.keras.callbacks import TensorBoard
 
 from datasets import KeypointsDataset
 from models import get_keypoints_detection_model
+from losses import KeypointsLoss
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
     ds_validation = KeypointsDataset(batch_size=batch_size, dataset="validation")
 
     # Get Model.
-    model = get_keypoints_detection_model(batch_normalization=True, activation="leaky_relu", dropout=True)
+    model = get_keypoints_detection_model(batch_normalization=True, activation="leaky_relu", dropout=False)
     model.summary()
 
     # Define optimizer.
@@ -27,7 +28,7 @@ def main():
     # Compile the model and optimizer.
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.mse,
+        loss=KeypointsLoss(),
         metrics=["mse"]
     )
 
@@ -42,13 +43,14 @@ def main():
         monitor="val_loss",
         factor=0.2,
         patience=5,
-        min_lr=learning_rate / 100
+        min_lr=learning_rate / 1000
     )
     tensorboard = TensorBoard(os.path.join("..", "logs", f"{time()}"))
     callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
+    # callbacks = [reduce_learning_rate, tensorboard]
 
     # Train the model w/callbacks.
-    epochs = 15
+    epochs = 40
     model.fit(
         x=ds_train,
         validation_data=ds_validation,
@@ -57,7 +59,7 @@ def main():
     )
 
     # Save the model.
-    model_path = os.path.join("..", "models", "keypoints", "my_model")
+    model_path = os.path.join("..", "models", "keypoints", "my_model_junk")
     model.save(
         f"{model_path}_"
         f"tim{time()}_"

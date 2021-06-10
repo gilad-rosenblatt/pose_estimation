@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from datasets import DetectionsDataset
+from datasets import DetectionsDataset, KeypointsDataset
 
 
 class WeightedMSE(tf.keras.losses.Loss):
@@ -58,34 +58,35 @@ class DetectionLoss(WeightedMSE):
         return mse_cls + mse_reg
 
 
-# FIXME get nans sometimes during training (do not ude this loss).
-class ScaledDetectionLoss(DetectionLoss):
-    """Compound MSE-based loss for object detection containing classification and two (scaled) regression parts."""
+class KeypointsLoss(tf.keras.losses.Loss):
 
-    def __init__(self, *args, **kwargs):
-        """Initialize custom detection loss object."""
-        super().__init__(*args, **kwargs)
+    def __init__(self, weight_nok=0.1, weight_kps=100, name="keypoints_mse"):
+        """
+        Initialize custom loss object.
+
+        :param float weight_nok: 0-1 weight to use for pixels in which a keypoint is not present.
+        :param float weight_kps: 0-1 weight to use for pixels in which a keypoint is present.
+        :param str name: name of the loss object.
+        """
+        super().__init__(name=name)
+        self.weight_nok = tf.constant([weight_nok], dtype=tf.float32)
+        self.weight_kps = tf.constant([weight_kps], dtype=tf.float32)
 
     def call(self, y_true, y_pred):
         """
-        Calculate weighted mean of squared errors between true and predicted y values separately for classification
-        and regression parts, and square the width and height dimensions to "resist" box scale changes.
+        Calculate weighted mean of squared errors between true and predicted y values.
 
-        :param tf.Tensor y_true: tensor of ground-truth values of shape (..., >1).
-        :param tf.Tensor y_pred: tensor of predicted values of shape (..., >1)..
+        :param tf.Tensor y_true: tensor of ground-truth values.
+        :param tf.Tensor y_pred: tensor of predicted values.
         :return tf.Tensor: loss value.
         """
-        mse1 = super().call(y_true=y_true[..., 0:3], y_pred=y_pred[..., 0:3])
-        mask = tf.where(y_true[..., 0:1] == 1, self.weight_box, 0)
-        mse2 = tf.reduce_mean(tf.multiply(mask, tf.square(tf.subtract(
-            tf.sqrt(tf.abs(y_true[..., 3:])),
-            tf.sqrt(tf.abs(y_pred[..., 3:]))
-        ))))
-        return mse1 + mse2
+        weights = tf.where(y_true[...] > 0.05, self.weight_kps, self.weight_nok)
+        weights = tf.where(tf.math.count_nonzero(y_true, [1, 2], keepdims=True) > 0, weights, 0.0)
+        return tf.reduce_mean(tf.multiply(weights, tf.square(tf.subtract(y_true, y_pred))))
 
 
 if __name__ == "__main__":
-    _, y = DetectionsDataset(batch_size=64, dataset="validation")[0]
+    _, y = KeypointsDataset(batch_size=64, dataset="validation")[0]
     y_true = tf.convert_to_tensor(y * 1.0)
-    y_pred = tf.convert_to_tensor(y * 0.8)
-    print(ScaledDetectionLoss().call(y_true=y_true, y_pred=y_pred))
+    y_pred = tf.convert_to_tensor(y * 0.2)
+    print(KeypointsLoss().call(y_true=y_true, y_pred=y_pred))

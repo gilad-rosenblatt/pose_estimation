@@ -360,13 +360,14 @@ class KeypointsPlotter:
         cv2.destroyWindow(window_name)
 
     @staticmethod
-    def show_batch(x, y_true, y_pred):
+    def show_batch(x, y_true, y_pred, show_keypoints=False):
         """
         Show side-by-side the batch ground truth and predictions image by image.
 
         :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
         :param np.nd.array y_true: (batch_size, *output_shape, 17) ground-truth heatmap-encoded keypoints.
         :param np.nd.array y_pred: (batch_size, *output_shape, 17) model predicted heatmap-encoded keypoints.
+        :param bool show_keypoints: if True draws ground truth and predicted skeletons onto the image.
         """
 
         # Get input and output dimensions.
@@ -377,42 +378,38 @@ class KeypointsPlotter:
         encoder = KeypointsEncoder(input_shape=input_shape, output_shape=output_shape)
 
         # Show ground-truth and predictions for each image in sequence.
-        window_name = "annotation_keypoints"
+        window_name1 = "keypoints"
+        window_name2 = "heatmaps"
         for this_x, this_y, this_pred in zip(x, y_true, y_pred):
 
             # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
             image_copy = image.copy()
 
-            # Decode keypoints for predictions and ground truth.
-            keypoints = encoder.decode(heatmap=this_y)
-            keypoints_pred = encoder.decode(heatmap=this_pred)
-
-            # Scale keypoints to from output to input shape.
-            keypoints = encoder.scale_keypoints(
-                keypoints=keypoints,
-                from_shape=encoder.output_shape,
-                to_shape=encoder.input_shape
-            )
-            keypoints_pred = encoder.scale_keypoints(
-                keypoints=keypoints_pred,
-                from_shape=encoder.output_shape,
-                to_shape=encoder.input_shape
-            )
-
-            # Draw skeletons on the image.
-            Skeleton.draw(image=image, keypoints=keypoints)
-            Skeleton.draw(image=image_copy, keypoints=keypoints_pred)
+            # Decode keypoints for predictions and ground truth and draw on the image.
+            if show_keypoints:
+                keypoints = encoder.decode(heatmap=this_y)
+                keypoints_pred = encoder.decode(heatmap=this_pred)
+                Skeleton.draw(image=image, keypoints=keypoints)
+                Skeleton.draw(image=image_copy, keypoints=keypoints_pred)
 
             # Show the image with drawn bounding boxes and circles.
-            cv2.imshow(window_name, np.hstack((image, image_copy)))
+            cv2.imshow(window_name1, np.hstack((
+                image,
+                image_copy
+            )))
+            cv2.imshow(window_name2, np.hstack((
+                cv2.applyColorMap((this_y.sum(axis=-1) * 255).astype(np.uint8), cv2.COLORMAP_JET),
+                cv2.applyColorMap((this_pred.sum(axis=-1) * 255).astype(np.uint8), cv2.COLORMAP_JET),
+            )))
 
             # Break the loop if key 'q' was pressed.
             if cv2.waitKey() & 0xFF == ord("q"):
                 break
 
         # Close the window.
-        cv2.destroyWindow(window_name)
+        cv2.destroyWindow(window_name1)
+        cv2.destroyWindow(window_name2)
 
 
 if __name__ == "__main__":

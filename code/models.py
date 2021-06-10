@@ -75,7 +75,7 @@ def get_keypoints_detection_model(batch_normalization=False, activation="relu", 
     x = decoder_block(x, filters=256)
 
     # Define the model keypoint heatmap regression head and return model.
-    outputs = tf.keras.layers.Conv2D(filters=num_keypoints, kernel_size=1, activation=None, padding="same")(x)
+    outputs = tf.keras.layers.Conv2D(filters=num_keypoints, kernel_size=1, activation="sigmoid", padding="same")(x)
     return tf.keras.Model(inputs=inputs, outputs=outputs)
 
 

@@ -82,6 +82,7 @@ def main():
         plt.figure()
         plt.imshow(cv2.cvtColor(crop_output, cv2.COLOR_BGRA2RGB))
         plt.imshow(heatmap.sum(axis=-1), alpha=0.7, interpolation="bilinear", cmap=plt.cm.get_cmap("viridis"))
+        plt.colorbar()
         plt.show()
 
         # Check decode method.

@@ -177,7 +177,7 @@ class KeypointsEncoder(DataEncoder):
         """
         Decode heatmap into keypoints in x, y, v format (v is 1 is a keypoint is detected 0 otherwise).
 
-        :param np.ndarray heatmap: (num_keypoints=17, 3) array in x, y, v format (v has a Y/N detected meaning here).
+        :param np.ndarray heatmap: (num_keypoints, 3) array in x, y, v format (v has a Y/N detected meaning here).
         :param bool interpolate: if True keypoints are estimated by interpolating Gaussian centers using 2 points.
         :return np.ndarray: (num_keypoints, 3) keypoints in input x, y, visible=0,1 format (0s for undetected points).
         """
@@ -186,7 +186,7 @@ class KeypointsEncoder(DataEncoder):
         threshold = 1e-5
 
         # Fill keypoints one-by-one iterating over heatmap slices.
-        keypoints = np.empty(shape=(17, 3), dtype=np.float32)
+        keypoints = np.empty(shape=(heatmap.shape[0], 3), dtype=np.float32)
         for keypoint_num in range(heatmap.shape[-1]):
 
             # Take a heatmap slice for this keypoint.
@@ -312,7 +312,7 @@ class KeypointsEncoder(DataEncoder):
 
         :param np.ndarray keypoints: (num_keypoints, 3) keypoints in original image coordinates in x, y, visible format.
         :param np.ndarray origin: (2,) new coordinates origin for keypoints given as x, y in te same coordinates as kps.
-        :return: (num_keypoints=17, 3) keypoints in coordinate w.r.t. new origin in x, y, visible format.
+        :return: (num_keypoints, 3) keypoints in coordinate w.r.t. new origin in x, y, visible format.
         """
 
         # Instantiate an array for keypoints in shifted coordinates (mark all as missing with 0s for visibility).
@@ -338,7 +338,7 @@ class KeypointsEncoder(DataEncoder):
         :param np.ndarray keypoints: (num_keypoints, 3) keypoints in crop coordinates in x, y, visible format.
         :param tuple from_shape: (height, width) of the un-resized crop (crop of original image pixels).
         :param tuple to_shape: (height, width) of the network input (resized crop).
-        :return: (num_keypoints=17, 3) keypoints in network input (resized crop) coordinates in x, y, visible format.
+        :return: (num_keypoints, 3) keypoints in network input (resized crop) coordinates in x, y, visible format.
         """
 
         # Extract old and new crop width and height.
@@ -373,7 +373,7 @@ class KeypointsEncoder(DataEncoder):
         """
 
         # Instantiate a heatmap to all zeros (for missing keypoints).
-        heatmap = np.zeros(shape=(*shape, 17), dtype=np.float32)  # TODO define Skeleton.NUM_KEYPOINTS?
+        heatmap = np.zeros(shape=(*shape, keypoints.shape[0]), dtype=np.float32)
 
         # Extract indices of viable keypoints (missing keypoints are denotes by visibility 0).
         is_keypoint = keypoints[:, 2] != 0
