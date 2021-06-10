@@ -5,7 +5,7 @@ from tensorflow.python.keras.callbacks import TensorBoard
 
 from datasets import DetectionsDataset
 from losses import DetectionLoss
-from models import get_model
+from models import get_object_detection_model
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     ds_validation = DetectionsDataset(batch_size=batch_size, dataset="validation")
 
     # Get Model.
-    model = get_model(batch_normalization=True, activation="leaky_relu", dropout=True)
+    model = get_object_detection_model(batch_normalization=True, activation="leaky_relu", dropout=True)
     model.summary()
 
     # Define optimizer.
