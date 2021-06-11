@@ -148,6 +148,7 @@ class Skeleton:
         15: "left_ankle",
         16: "right_ankle"
     }
+    KEYPOINT_NUM = len(KEYPOINT_NAMES)
 
     # Skeleton lines encoded in keypoint indices (0-based) and their corresponding colors.
     SKELETON = [
@@ -217,6 +218,15 @@ class Skeleton:
 
     @staticmethod
     def draw_with_heatmap(image, heatmap, keypoints=None, keypoint_indices=None, alpha=0.5):
+        """
+        Draw heatmap on the image along with keypoints for selected keypoint channels using an alpha blend.
+
+        :param image: image to show keypoints and heatmap for/over.
+        :param np.nd.array heatmap: (*output_shape, num_keypoints) heatmap-encoded keypoints.
+        :param np.ndarray keypoints: (num_keypoints, 3) array for x, y, visible_flag for each of a persons keypoints.
+        :param list keypoint_indices: list of keypoint channel indices to show for.
+        :param float alpha: the alpha color blend parameter for the overlay of the heatmap with the image.
+        """
 
         # Extract the existing (nonzero v) keypoint channels.
         is_keypoint = keypoints[:, 2] != 0 if keypoints is not None else np.ones(shape=heatmap.shape[-1])  # This 1st.
@@ -366,7 +376,7 @@ class KeypointsPlotter:
         """
         Show the generated images and their person keypoints (skeleton) and bounding box annotations image by image.
 
-        :param generator: generator of single image, a (4,) bounding box, and (17,) keypoints trio.
+        :param generator: generator of single image, a (4,) bounding box, and (num_keypoints=17,) keypoints trio.
         """
 
         # Show each image along with its bounding boxes in sequence.
@@ -392,8 +402,8 @@ class KeypointsPlotter:
         Show side-by-side the batch ground truth and predictions image by image.
 
         :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
-        :param np.nd.array y_true: (batch_size, *output_shape, 17) ground-truth heatmap-encoded keypoints.
-        :param np.nd.array y_pred: (batch_size, *output_shape, 17) model predicted heatmap-encoded keypoints.
+        :param np.nd.array y_true: (batch_size, *output_shape, num_keypoints) ground-truth heatmap-encoded keypoints.
+        :param np.nd.array y_pred: (batch_size, *output_shape, num_keypoints) model predicted heatmap-encoded keypoints.
         :param show_keypoints: list of skeleton keypoint indices to show or True/False to draw all keypoints or none.
         """
 

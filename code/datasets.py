@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from encoders import DetectionsEncoder, KeypointsEncoder
 from parsers import DetectionsParser, KeypointsParser
-from plotters import DetectionsPlotter, KeypointsPlotter
+from plotters import DetectionsPlotter, KeypointsPlotter, Skeleton
 
 
 class Dataset(tf.keras.utils.Sequence, ABC):
@@ -173,9 +173,6 @@ class DetectionsDataset(Dataset):
 class KeypointsDataset(Dataset):
     """Generator of image batches and their ground truth keypoints encoded as heatmaps for pose estimation."""
 
-    # List of keypoint to include in the dataset (denoted by 0-16 indices).
-    KEYPOINTS = list(range(17))
-
     # Input image shape without channels (height, width).
     INPUT_SHAPE = (256, 192)
 
@@ -195,7 +192,7 @@ class KeypointsDataset(Dataset):
 
         # Initialize input and output arrays (take batch size from indices since last batch can be smaller).
         x = np.empty(shape=(len(batch_info), *KeypointsDataset.INPUT_SHAPE, 3), dtype=np.float32)
-        y = np.empty(shape=(len(batch_info), *KeypointsDataset.OUTPUT_SHAPE, len(self.KEYPOINTS)), dtype=np.float32)
+        y = np.empty(shape=(len(batch_info), *KeypointsDataset.OUTPUT_SHAPE, Skeleton.KEYPOINT_NUM), dtype=np.float32)
 
         # Fill input and output arrays image-by-image. Does not raise IndexError (last batch check done by tf.Sequence).
         for index, (filename, box, keypoints) in enumerate(batch_info):
@@ -203,7 +200,7 @@ class KeypointsDataset(Dataset):
             # Load the image and instantiate numpy arrays for the detection box and keypoints (one per row).
             this_image = cv2.imread(self._parser.get_path(filename))
             box = np.array(box, dtype=np.float32)
-            keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 3)[np.array(self.KEYPOINTS)]
+            keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 3)
 
             # Crop and resize image to input shape and move/rescale keypoints to input coordinates.
             this_image, keypoints = self._resize(image=this_image, box=box, keypoints=keypoints)
