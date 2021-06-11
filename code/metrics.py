@@ -14,7 +14,7 @@ from plotters import DetectionsPlotter
 from parsers import DetectionsParser
 
 
-class ModelEvaluator:
+class DetectionModelEvaluator:
     """Evaluator for calculating mAP scores on object detection models trained on COCO."""
 
     # Saved models and score files parent directories.
@@ -44,7 +44,7 @@ class ModelEvaluator:
         coco_gt = COCO(annotation_file=DetectionsParser.get_annotation_file(dataset=self.dataset))
 
         # Load model.
-        model = tf.keras.models.load_model(os.path.join(ModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
+        model = tf.keras.models.load_model(os.path.join(DetectionModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
 
         # Initialize encoder (model output <--> boxes and scores).
         encoder = DetectionsEncoder(input_shape=dataset.INPUT_SHAPE, output_shape=dataset.OUTPUT_SHAPE)
@@ -77,12 +77,12 @@ class ModelEvaluator:
                 annotations.extend(coco_gt.loadNumpyAnnotations(data=result))
 
         # Save collected annotations to a json results file whose name derives from model name and threshold values.
-        filename = ModelEvaluator.get_filename(
+        filename = DetectionModelEvaluator.get_filename(
             model_filename=self.model_filename,
             cls_threshold=cls_threshold,
             nms_threshold=nms_threshold
         )
-        with open(os.path.join(ModelEvaluator.SCORES_DIR, filename), "w") as out_file:
+        with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, filename), "w") as out_file:
             json.dump(annotations, out_file)
 
         # Return the filename.
@@ -97,7 +97,7 @@ class ModelEvaluator:
         """
 
         # Open results json file.
-        full_filename = os.path.join(ModelEvaluator.SCORES_DIR, filename)
+        full_filename = os.path.join(DetectionModelEvaluator.SCORES_DIR, filename)
         with open(full_filename, "r") as in_file:
             detections = json.load(in_file)
 
@@ -129,7 +129,7 @@ class ModelEvaluator:
 
         :param str filename: filename for the annotation json file.
         """
-        with open(os.path.join(ModelEvaluator.SCORES_DIR, filename), "r") as in_file:
+        with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, filename), "r") as in_file:
             detections = json.load(in_file)
         DetectionsPlotter.show_annotations(detections)
 
@@ -150,10 +150,10 @@ class ModelEvaluator:
 if __name__ == "__main__":
     # scorer = ModelEvaluator(model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01")
     # this_filename = scorer.predict_and_save(cls_threshold=0.8, nms_threshold=0.3)
-    this_filename = ModelEvaluator.get_filename(
+    this_filename = DetectionModelEvaluator.get_filename(
         model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01",
         cls_threshold=0.8,
         nms_threshold=0.3
     )
-    stats = ModelEvaluator.score(this_filename)
-    ModelEvaluator.show(this_filename)
+    stats = DetectionModelEvaluator.score(this_filename)
+    DetectionModelEvaluator.show(this_filename)

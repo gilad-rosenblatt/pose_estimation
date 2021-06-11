@@ -1,15 +1,19 @@
 import os
+from time import time
 
 import tensorflow as tf
 
 from datasets import KeypointsDataset
-from plotters import KeypointsPlotter
 from models import get_keypoints_detection_model
+from plotters import KeypointsPlotter
 
 
-def get_model_from_checkpoint(epoch, *args, **kwargs):
+def save_model_from_checkpoint(epoch, batch_size, *args, **kwargs):
     checkpoint_path = os.path.join("..", "training", "keypoints", f"cp-{epoch:03d}.ckpt")
-    return get_keypoints_detection_model(*args, **kwargs).load_weights(checkpoint_path)
+    model = get_keypoints_detection_model(*args, **kwargs)
+    model.load_weights(checkpoint_path)
+    model_path = os.path.join("..", "models", "keypoints", "my_model")
+    model.save(f"{model_path}_tim{time()}_bsz{batch_size}_epo{epoch}")
 
 
 def main():

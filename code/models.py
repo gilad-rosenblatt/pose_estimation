@@ -43,7 +43,7 @@ def get_keypoints_detection_model(batch_normalization=False, activation="relu", 
     """
 
     # Number of keypoints to encode.
-    num_keypoints = 17
+    num_keypoints = 17  # TODO move stuff like this to a config file.
 
     # Define the basic building block of the encoder.
     def encoder_block(x, repetitions, filters, pooling=True):

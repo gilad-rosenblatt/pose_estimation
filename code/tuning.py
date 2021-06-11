@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from metrics import ModelEvaluator
+from metrics import DetectionModelEvaluator
 
 
 def run_grid_scan(model_filename):
@@ -19,18 +19,18 @@ def run_grid_scan(model_filename):
     nms_thresholds = np.arange(0.2, 0.8, 0.10)
 
     # Initialize a model evaluator (mAP over COCO validation).
-    scorer = ModelEvaluator(model_filename=model_filename)
+    scorer = DetectionModelEvaluator(model_filename=model_filename)
 
     # Make sure a scores folder exists.
-    if not os.path.exists(ModelEvaluator.SCORES_DIR):
-        os.makedirs(ModelEvaluator.SCORES_DIR)
+    if not os.path.exists(DetectionModelEvaluator.SCORES_DIR):
+        os.makedirs(DetectionModelEvaluator.SCORES_DIR)
 
     # Scan over the gris of hyperparameters and collect score stats for each combination.
     stats = []
     for cls_threshold, nms_threshold in itertools.product(cls_thresholds, nms_thresholds):
         print(f"Predicting ans scoring with cls_th = {cls_threshold:.2f}, nms_th = {nms_threshold:.2f}...")
         this_filename = scorer.predict_and_save(cls_threshold=cls_threshold, nms_threshold=nms_threshold)
-        this_stats = ModelEvaluator.score(this_filename)
+        this_stats = DetectionModelEvaluator.score(this_filename)
         stats.append(dict(
             cls_threshold=float(cls_threshold),
             nms_threshold=float(nms_threshold),
@@ -41,7 +41,7 @@ def run_grid_scan(model_filename):
         ))
 
     # Save all stats to json file.
-    with open(os.path.join(ModelEvaluator.SCORES_DIR, "threshold_tuning.json"), "w") as out_file:
+    with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, "threshold_tuning.json"), "w") as out_file:
         json.dump(stats, out_file)
 
 
@@ -57,7 +57,7 @@ def get_best_hypers(category="map_50"):
     assert category in ["map_50", "map_75", "map_50_to_95"]
 
     # Open model mAP stats from grid search.
-    with open(os.path.join(ModelEvaluator.SCORES_DIR, "threshold_tuning.json"), "r") as in_file:
+    with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, "threshold_tuning.json"), "r") as in_file:
         stats = json.load(in_file)
 
     # Collect mAP @ IoU=0.50 scores for each hyperparameter combination and sort.
