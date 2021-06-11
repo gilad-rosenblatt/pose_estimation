@@ -24,7 +24,7 @@ def main():
         # model.load_weights(os.path.join("..", "training", "keypoints", "cp-001.ckpt"))
         model = tf.keras.models.load_model(os.path.join(models_dir, filename), compile=False)
         y_prob = model.predict(x=x)
-        KeypointsPlotter.show_batch(x=x, y_true=y_true, y_pred=y_prob)
+        KeypointsPlotter.show_batch(x=x, y_true=y_true, y_pred=y_prob, show_keypoints=False)
 
 
 if __name__ == "__main__":

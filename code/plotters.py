@@ -218,23 +218,23 @@ class Skeleton:
     @staticmethod
     def draw_with_heatmap(image, heatmap, keypoints=None, keypoint_indices=None, alpha=0.5):
 
-        # Extract keypoints to show.
-        if not isinstance(keypoints, np.ndarray):
-            keypoints = np.zeros(shape=(heatmap.shape[-1], 3), dtype=np.float32)
-        is_keypoint = keypoints[:, 2] != 0
+        # Extract the existing (nonzero v) keypoint channels.
+        is_keypoint = keypoints[:, 2] != 0 if keypoints is not None else np.ones(shape=heatmap.shape[-1])  # This 1st.
+        keypoints = keypoints if keypoints is not None else np.zeros(shape=(heatmap.shape[-1], 3), dtype=np.float32)
+
+        # Mark the requested keypoint channels to show.
+        keypoint_indices = np.array(keypoint_indices) if keypoint_indices else np.arange(0, keypoints.shape[0])
         to_show = np.zeros(keypoints.shape[0])
-        if keypoint_indices:
-            to_show[np.array(keypoint_indices)] = True
-        else:
-            to_show[:] = True
+        to_show[keypoint_indices] = True
 
         # Draw skeleton for selected keypoints over the image.
         keypoints_reduced = keypoints.copy()
         keypoints_reduced[to_show == 0, 2] = 0
         Skeleton.draw(image=image, keypoints=keypoints_reduced)
 
-        # Resize heatmap for selected keypoints and alpha blend it to the image.
-        overlay = heatmap[..., (is_keypoint == 1) & (to_show == 1)].sum(axis=-1) * 255
+        # Resize heatmap and alpha blend it to the image for selected keypoints.
+        show_channels = (is_keypoint == 1) & (to_show == 1)
+        overlay = heatmap[..., show_channels].sum(axis=-1) * 255
         overlay = np.clip(overlay, a_min=0, a_max=255).astype(np.uint8)
         overlay = cv2.resize(src=overlay, dsize=tuple(reversed(image.shape[:-1])))  # Use opencv convention (w, h).
         overlay = cv2.applyColorMap(src=overlay, colormap=cv2.COLORMAP_JET)
@@ -394,7 +394,7 @@ class KeypointsPlotter:
         :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
         :param np.nd.array y_true: (batch_size, *output_shape, 17) ground-truth heatmap-encoded keypoints.
         :param np.nd.array y_pred: (batch_size, *output_shape, 17) model predicted heatmap-encoded keypoints.
-        :param bool show_keypoints: if True draws ground truth and predicted skeletons onto the image.
+        :param show_keypoints: list of skeleton keypoint indices to show or True/False to draw all keypoints or none.
         """
 
         # Get input and output dimensions.
@@ -414,19 +414,28 @@ class KeypointsPlotter:
             image_copies = [image.copy() for _ in range(3)]
 
             # Decode keypoints for predictions and ground truth and draw on the image.
+            keypoints = encoder.decode(heatmap=this_y) if show_keypoints else None
+            keypoints_pred = encoder.decode(heatmap=this_pred) if show_keypoints else None
+            keypoint_indices = show_keypoints if isinstance(show_keypoints, list) else None  # Is kp indices list?
             if show_keypoints:
-                keypoints = encoder.decode(heatmap=this_y)
-                keypoints_pred = encoder.decode(heatmap=this_pred)
                 Skeleton.draw(image=image, keypoints=keypoints)
                 Skeleton.draw(image=image_copies[0], keypoints=keypoints_pred)
                 Skeleton.draw(image=image_copies[1], keypoints=keypoints)
                 Skeleton.draw(image=image_copies[2], keypoints=keypoints_pred)
-            else:
-                keypoints = keypoints_pred = None
 
             # Draw heatmaps for predictions and ground truth.
-            Skeleton.draw_with_heatmap(image=image_copies[1], heatmap=this_y, keypoints=keypoints)
-            Skeleton.draw_with_heatmap(image=image_copies[2], heatmap=this_pred, keypoints=keypoints_pred)
+            Skeleton.draw_with_heatmap(
+                image=image_copies[1],
+                heatmap=this_y,
+                keypoints=keypoints,
+                keypoint_indices=keypoint_indices
+            )
+            Skeleton.draw_with_heatmap(
+                image=image_copies[2],
+                heatmap=this_pred,
+                keypoints=keypoints_pred,
+                keypoint_indices=keypoint_indices
+            )
 
             # Show the image with predictions and ground truth keypoints and heatmaps.
             cv2.imshow(window_name1, np.hstack((image, image_copies[0])))
