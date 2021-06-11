@@ -11,7 +11,7 @@ from losses import KeypointsLoss
 
 def main():
     # Load dataset generators.
-    batch_size = 1
+    batch_size = 64
     ds_train = KeypointsDataset(batch_size=batch_size, dataset="train", shuffle=True)
     ds_validation = KeypointsDataset(batch_size=batch_size, dataset="validation")
 
@@ -46,11 +46,10 @@ def main():
         min_lr=learning_rate / 1000
     )
     tensorboard = TensorBoard(os.path.join("..", "logs", f"{time()}"))
-    # callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
-    callbacks = [reduce_learning_rate, tensorboard]
+    callbacks = [save_checkpoint, reduce_learning_rate, tensorboard]
 
     # Train the model w/callbacks.
-    epochs = 40
+    epochs = 20
     model.fit(
         x=ds_train,
         validation_data=ds_validation,

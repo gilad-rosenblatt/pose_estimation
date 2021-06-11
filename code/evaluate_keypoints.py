@@ -23,8 +23,9 @@ def main():
 
     # Define models to show.
     filenames = dict(
-        # stage_1="my_model_tim1623386780.9279761_bsz64_epo15",  # 15ep@LR0.001&100ROP.
-        stage_2="my_model_tim1623401683.0648534_bsz64_epo40"  # 40ep@LR0.001&1000ROP.
+        stage_1="my_model_tim1623386780.9279761_bsz64_epo15",  # 15ep@LR0.001&100ROP.
+        # stage_2="my_model_tim1623401683.0648534_bsz64_epo40",  # 40ep@LR0.001&1000ROP. KP Y/N loss. Overfit.
+        # stage_3="my_model_tim1623423664.7099812_bsz64_epo7",  # 40ep@LR0.001&1000ROP. Disk mask loss. BAD.
     )
 
     # Load models and show their predictions on the test batch (press "q" to exit).

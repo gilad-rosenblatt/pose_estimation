@@ -20,7 +20,7 @@ def main():
             np.array(box, dtype=np.float32),
             np.array(keypoints, dtype=np.float32).reshape(-1, 3)
         )
-        for filename, box, keypoints in parser.info
+        for filename, box, keypoints, _ in parser.info
     )
 
     # Show each image along with its bounding boxes in sequence.

@@ -8,18 +8,18 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
 from boxops import NMS
-from datasets import DetectionsDataset
-from encoders import DetectionsEncoder
-from plotters import DetectionsPlotter
-from parsers import DetectionsParser
+from datasets import DetectionsDataset, KeypointsDataset
+from encoders import DetectionsEncoder, KeypointsEncoder
+from plotters import DetectionsPlotter, KeypointsPlotter
+from parsers import DetectionsParser, KeypointsParser
 
 
-class DetectionModelEvaluator:
-    """Evaluator for calculating mAP scores on object detection models trained on COCO."""
+class ModelEvaluator:
+    """Evaluator for calculating scores on models trained on COCO."""
 
     # Saved models and score files parent directories.
-    MODELS_DIR = os.path.join("..", "models", "detection")  # TODO this should be stored somewhere else.
-    SCORES_DIR = os.path.join("..", "scores", "detection")
+    MODELS_BASE_DIR = os.path.join("..", "models")  # TODO this should be stored somewhere else.
+    SCORES_BASE_DIR = os.path.join("..", "scores")
 
     def __init__(self, model_filename, dataset="validation"):
         """
@@ -31,6 +31,10 @@ class DetectionModelEvaluator:
         self.model_filename = model_filename
         self.dataset = dataset
 
+
+class DetectionEvaluator(ModelEvaluator):
+    """Evaluator for calculating mAP scores on object detection models trained on COCO."""
+
     def predict_and_save(self, cls_threshold=0.8, nms_threshold=0.3):
         """
         Collect and save the predicted detections of the model on the COCO validation set to a json file.
@@ -40,14 +44,20 @@ class DetectionModelEvaluator:
         """
 
         # Load dataset and and COCO API object.
-        dataset = DetectionsDataset(batch_size=64, dataset=self.dataset, generate_image_ids=True)
+        dataset = DetectionsDataset(batch_size=64, dataset=self.dataset, generate_ids=True)
         coco_gt = COCO(annotation_file=DetectionsParser.get_annotation_file(dataset=self.dataset))
 
         # Load model.
-        model = tf.keras.models.load_model(os.path.join(DetectionModelEvaluator.MODELS_DIR, self.model_filename), compile=False)
+        model = tf.keras.models.load_model(
+            filepath=os.path.join(ModelEvaluator.MODELS_BASE_DIR, "detection", self.model_filename),
+            compile=False
+        )
 
         # Initialize encoder (model output <--> boxes and scores).
-        encoder = DetectionsEncoder(input_shape=dataset.INPUT_SHAPE, output_shape=dataset.OUTPUT_SHAPE)
+        encoder = DetectionsEncoder(
+            input_shape=dataset.INPUT_SHAPE,
+            output_shape=dataset.OUTPUT_SHAPE
+        )
 
         # Initialize the list of annotations (detections).
         annotations = []
@@ -77,12 +87,12 @@ class DetectionModelEvaluator:
                 annotations.extend(coco_gt.loadNumpyAnnotations(data=result))
 
         # Save collected annotations to a json results file whose name derives from model name and threshold values.
-        filename = DetectionModelEvaluator.get_filename(
+        filename = DetectionEvaluator.get_filename(
             model_filename=self.model_filename,
             cls_threshold=cls_threshold,
             nms_threshold=nms_threshold
         )
-        with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, filename), "w") as out_file:
+        with open(os.path.join(DetectionEvaluator.SCORES_BASE_DIR, "detection", filename), "w") as out_file:
             json.dump(annotations, out_file)
 
         # Return the filename.
@@ -97,7 +107,7 @@ class DetectionModelEvaluator:
         """
 
         # Open results json file.
-        full_filename = os.path.join(DetectionModelEvaluator.SCORES_DIR, filename)
+        full_filename = os.path.join(DetectionEvaluator.SCORES_BASE_DIR, "detection", filename)
         with open(full_filename, "r") as in_file:
             detections = json.load(in_file)
 
@@ -129,7 +139,7 @@ class DetectionModelEvaluator:
 
         :param str filename: filename for the annotation json file.
         """
-        with open(os.path.join(DetectionModelEvaluator.SCORES_DIR, filename), "r") as in_file:
+        with open(os.path.join(DetectionEvaluator.SCORES_BASE_DIR, "detection", filename), "r") as in_file:
             detections = json.load(in_file)
         DetectionsPlotter.show_annotations(detections)
 
@@ -150,10 +160,10 @@ class DetectionModelEvaluator:
 if __name__ == "__main__":
     # scorer = ModelEvaluator(model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01")
     # this_filename = scorer.predict_and_save(cls_threshold=0.8, nms_threshold=0.3)
-    this_filename = DetectionModelEvaluator.get_filename(
+    this_filename = DetectionEvaluator.get_filename(
         model_filename="my_model_tim1622826272.136246_bsz64_epo21_ckp01",
         cls_threshold=0.8,
         nms_threshold=0.3
     )
-    stats = DetectionModelEvaluator.score(this_filename)
-    DetectionModelEvaluator.show(this_filename)
+    stats = DetectionEvaluator.score(this_filename)
+    DetectionEvaluator.show(this_filename)
