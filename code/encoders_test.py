@@ -24,7 +24,7 @@ def main():
     )
 
     # Show each image along with its bounding boxes in sequence.
-    window_names = ["annotation", "input", "output"]
+    window_names = ["annotation", "input", "output", "blend"]
     for image, box_detection, keypoints in generator:
 
         # Expand detection box to get crop box.
@@ -74,19 +74,16 @@ def main():
         cv2.imshow(window_names[1], crop_input)
         cv2.imshow(window_names[2], crop_output)
 
+        # Show the output crop heatmap and the encoded and decoded keypoints.
+        Skeleton.draw_with_heatmap(image=crop_input, heatmap=heatmap, keypoints=keypoints_input)
+        cv2.imshow(window_names[3], crop_input)
+
         # Break the loop if key 'q' was pressed.
         if cv2.waitKey() & 0xFF == ord("q"):
             break
 
-        # Show the output crop heatmap and the encoded and decoded keypoints.
-        plt.figure()
-        plt.imshow(cv2.cvtColor(crop_output, cv2.COLOR_BGRA2RGB))
-        plt.imshow(heatmap.sum(axis=-1), alpha=0.7, interpolation="bilinear", cmap=plt.cm.get_cmap("viridis"))
-        plt.colorbar()
-        plt.show()
-
         # Check decode method.
-        keypoints_decoded = encoder.decode(heatmap=heatmap, interpolate=True)
+        keypoints_decoded = encoder.decode(heatmap=heatmap, interpolate=False)
         is_keypoint_decoded = keypoints_decoded[:, 2] != 0
         is_keypoint_scaled = keypoints_input[:, 2] != 0
         print("Number of keypoints:", is_keypoint_decoded.sum(), is_keypoint_scaled.sum())

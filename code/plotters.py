@@ -129,26 +129,25 @@ class Skeleton:
     """Representation of a person's keypoints skeleton."""
 
     # Interpretation of each of the 17 person keypoints by index.
-    # FIXME missing 1 keypoint name.
-    KEYPOINT_NAMES = [
-        "nose"
-        "left_eye",
-        "right_eye",
-        "left_ear",
-        "right_ear",
-        "left_shoulder",
-        "right_shoulder",
-        "left_elbow",
-        "right_elbow",
-        "left_wrist",
-        "right_wrist",
-        "left_hip",
-        "right_hip",
-        "left_knee",
-        "right_knee",
-        "left_ankle",
-        "right_ankle"
-    ]
+    KEYPOINT_NAMES = {
+        0: "nose",
+        1: "left_eye",
+        2: "right_eye",
+        3: "left_ear",
+        4: "right_ear",
+        5: "left_shoulder",
+        6: "right_shoulder",
+        7: "left_elbow",
+        8: "right_elbow",
+        9: "left_wrist",
+        10: "right_wrist",
+        11: "left_hip",
+        12: "right_hip",
+        13: "left_knee",
+        14: "right_knee",
+        15: "left_ankle",
+        16: "right_ankle"
+    }
 
     # Skeleton lines encoded in keypoint indices (0-based) and their corresponding colors.
     SKELETON = [
@@ -199,19 +198,47 @@ class Skeleton:
         return lines[:index], colors  # Return only valid indices.
 
     @staticmethod
-    def draw(image, keypoints, box=None):
+    def draw(image, keypoints, box=None, alpha=0.9):
         """
         Make skeleton lines out of an input keypoints array for a single person over a given image. Optionally add box.
 
         :param np.ndarray image: image to draw on (assumed uint8 BGR image).
         :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
         :param np.ndarray box: box array sized (4,) for x1, y1, width, height in image pixel units.
+        :param float alpha: the alpha color blend parameter for the overlay of the skeleton lines with the image.
         """
         if isinstance(box, np.ndarray):
             yellow = (0, 204, 204)
             Drawer.draw_boxes(image=image, boxes=box[np.newaxis, :], colors=[yellow])
+        overlay = image.copy()
         lines, colors = Skeleton._make_lines(keypoints=keypoints)
-        Drawer.draw_lines(image=image, lines=lines, colors=colors, mark_endpoints=True)
+        Drawer.draw_lines(image=overlay, lines=lines, colors=colors, mark_endpoints=True)
+        cv2.addWeighted(src1=overlay, alpha=alpha, src2=image, beta=1 - alpha, gamma=0, dst=image)
+
+    @staticmethod
+    def draw_with_heatmap(image, heatmap, keypoints=None, keypoint_indices=None, alpha=0.5):
+
+        # Extract keypoints to show.
+        if not isinstance(keypoints, np.ndarray):
+            keypoints = np.zeros(shape=(heatmap.shape[-1], 3), dtype=np.float32)
+        is_keypoint = keypoints[:, 2] != 0
+        to_show = np.zeros(keypoints.shape[0])
+        if keypoint_indices:
+            to_show[np.array(keypoint_indices)] = True
+        else:
+            to_show[:] = True
+
+        # Draw skeleton for selected keypoints over the image.
+        keypoints_reduced = keypoints.copy()
+        keypoints_reduced[to_show == 0, 2] = 0
+        Skeleton.draw(image=image, keypoints=keypoints_reduced)
+
+        # Resize heatmap for selected keypoints and alpha blend it to the image.
+        overlay = heatmap[..., (is_keypoint == 1) & (to_show == 1)].sum(axis=-1) * 255
+        overlay = np.clip(overlay, a_min=0, a_max=255).astype(np.uint8)
+        overlay = cv2.resize(src=overlay, dsize=tuple(reversed(image.shape[:-1])))  # Use opencv convention (w, h).
+        overlay = cv2.applyColorMap(src=overlay, colormap=cv2.COLORMAP_JET)
+        cv2.addWeighted(src1=overlay, alpha=alpha, src2=image, beta=1 - alpha, gamma=0, dst=image)
 
 
 class DetectionsPlotter:
@@ -360,7 +387,7 @@ class KeypointsPlotter:
         cv2.destroyWindow(window_name)
 
     @staticmethod
-    def show_batch(x, y_true, y_pred, show_keypoints=False):
+    def show_batch(x, y_true, y_pred, show_keypoints=True):
         """
         Show side-by-side the batch ground truth and predictions image by image.
 
@@ -384,24 +411,26 @@ class KeypointsPlotter:
 
             # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
-            image_copy = image.copy()
+            image_copies = [image.copy() for _ in range(3)]
 
             # Decode keypoints for predictions and ground truth and draw on the image.
             if show_keypoints:
                 keypoints = encoder.decode(heatmap=this_y)
                 keypoints_pred = encoder.decode(heatmap=this_pred)
                 Skeleton.draw(image=image, keypoints=keypoints)
-                Skeleton.draw(image=image_copy, keypoints=keypoints_pred)
+                Skeleton.draw(image=image_copies[0], keypoints=keypoints_pred)
+                Skeleton.draw(image=image_copies[1], keypoints=keypoints)
+                Skeleton.draw(image=image_copies[2], keypoints=keypoints_pred)
+            else:
+                keypoints = keypoints_pred = None
 
-            # Show the image with drawn bounding boxes and circles.
-            cv2.imshow(window_name1, np.hstack((
-                image,
-                image_copy
-            )))
-            cv2.imshow(window_name2, np.hstack((
-                cv2.applyColorMap((this_y.sum(axis=-1) * 255).astype(np.uint8), cv2.COLORMAP_JET),
-                cv2.applyColorMap((this_pred.sum(axis=-1) * 255).astype(np.uint8), cv2.COLORMAP_JET),
-            )))
+            # Draw heatmaps for predictions and ground truth.
+            Skeleton.draw_with_heatmap(image=image_copies[1], heatmap=this_y, keypoints=keypoints)
+            Skeleton.draw_with_heatmap(image=image_copies[2], heatmap=this_pred, keypoints=keypoints_pred)
+
+            # Show the image with predictions and ground truth keypoints and heatmaps.
+            cv2.imshow(window_name1, np.hstack((image, image_copies[0])))
+            cv2.imshow(window_name2, np.hstack((image_copies[1], image_copies[2])))
 
             # Break the loop if key 'q' was pressed.
             if cv2.waitKey() & 0xFF == ord("q"):
@@ -413,7 +442,6 @@ class KeypointsPlotter:
 
 
 if __name__ == "__main__":
-
     # Parse keypoints COCO annotations.
     parser = KeypointsParser(dataset="validation")
 
@@ -421,7 +449,7 @@ if __name__ == "__main__":
     generator = (
         (
             cv2.imread(filename=parser.get_path(filename=filename)),
-            np.array(box, dtype=np.float32 ),
+            np.array(box, dtype=np.float32),
             np.array(keypoints, dtype=np.float32).reshape(-1, 3)
         )
         for filename, box, keypoints in parser.info

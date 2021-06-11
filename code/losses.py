@@ -80,8 +80,8 @@ class KeypointsLoss(tf.keras.losses.Loss):
         :param tf.Tensor y_pred: tensor of predicted values.
         :return tf.Tensor: loss value.
         """
-        weights = tf.where(y_true[...] > 0.05, self.weight_kps, self.weight_nok)
-        weights = tf.where(tf.math.count_nonzero(y_true, [1, 2], keepdims=True) > 0, weights, 0.0)
+        # weights = tf.where(y_true[...] > 0.05, self.weight_kps, self.weight_nok)
+        weights = tf.where(tf.math.count_nonzero(y_true, [1, 2], keepdims=True) > 0, 1.0, 0.0)
         return tf.reduce_mean(tf.multiply(weights, tf.square(tf.subtract(y_true, y_pred))))
 
 

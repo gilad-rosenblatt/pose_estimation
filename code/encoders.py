@@ -186,8 +186,9 @@ class KeypointsEncoder(DataEncoder):
         threshold = 1e-5
 
         # Fill keypoints one-by-one iterating over heatmap slices.
-        keypoints = np.empty(shape=(heatmap.shape[0], 3), dtype=np.float32)
-        for keypoint_num in range(heatmap.shape[-1]):
+        num_keypoints = heatmap.shape[-1]
+        keypoints = np.empty(shape=(num_keypoints, 3), dtype=np.float32)
+        for keypoint_num in range(num_keypoints):
 
             # Take a heatmap slice for this keypoint.
             this_heatmap = heatmap[..., keypoint_num]

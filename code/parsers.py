@@ -112,7 +112,7 @@ class KeypointsParser(Parser):
             for annotation in coco_gt.loadAnns(ids=coco_gt.getAnnIds(catIds=[1]))  # All person annotations.
             if not annotation["iscrowd"] and annotation["num_keypoints"] > 0 and annotation["area"] > 0  # Drop empties.
         ]
-        return annotations_list#[:1]
+        return annotations_list
 
 
 if __name__ == "__main__":
