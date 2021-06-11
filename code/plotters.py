@@ -459,6 +459,10 @@ class KeypointsPlotter:
         cv2.destroyWindow(window_name1)
         cv2.destroyWindow(window_name2)
 
+    @staticmethod
+    def show_annotations(annotations):
+        raise NotImplemented
+
 
 if __name__ == "__main__":
     # Parse keypoints COCO annotations.

@@ -60,7 +60,7 @@ class ImageDataGenerator(Dataset, ABC):
         """
         Load dataset detection annotations and save configuration flags.
 
-        :param generate_ids: if True generates image IDs (x, y, id) with each batch (for scoring purposes).
+        :param generate_ids: if True generates image/annotation IDs (x, y, id) with each batch (for scoring purposes).
         """
         super().__init__(*args, **kwargs)
         self.generate_ids = generate_ids
@@ -90,7 +90,7 @@ class ImageDataGenerator(Dataset, ABC):
             # Process this annotation into an x, y slice.
             this_x, this_y = self.process_annotation(*annotation)
 
-            # Append this x and y to the batch (and add this image ID).
+            # Append this x and y to the batch (and add this image/annotation ID).
             x[index, ...] = this_x
             y[index, ...] = this_y
             if self.generate_ids:
@@ -295,6 +295,35 @@ class KeypointsDataset(ImageDataGenerator):
 
         # Return image crop and associated keypoints in input shape/coordinates.
         return (input_crop, input_keypoints) if not return_box else (input_crop, None, input_keypoints)  # FIXME box.
+
+    @classmethod
+    def upsize(cls, box, keypoints):
+        """
+        Map keypoints from input to original image coordinates using the crop box (in original image coordinates).
+
+        :param np.ndarray box: (4,) bounding box in x1, y1, w, h format (1: upper left corner) in image coordinates.
+        :param np.ndarray keypoints: (num_keypoints, 3) keypoints array in x, y, visible format in input coordinates.
+        :return np.ndarray: i(num_keypoints, 3) keypoints array in x, y, visible format in image coordinates (pre-crop).
+        """
+
+        # Unpack box coordinates.
+        x1, y1, w, h = box
+
+        # Scale and resize keypoints from input coordinates to the crop coordinates (relative to x1, y1).
+        keypoints_moved = KeypointsEncoder.scale_keypoints(
+            keypoints=keypoints,
+            from_shape=cls.INPUT_SHAPE,
+            to_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1)),  # Crop box shape (integer pixel numbers).
+        )
+
+        # Move keypoints back to coordinates of original image.
+        keypoints_image = KeypointsEncoder.move_keypoints(
+            origin=-np.array([int(x1), int(y1)], dtype=np.float32),  # Negative sign!
+            keypoints=keypoints_moved
+        )
+
+        # Return keypoints in original image coordinates.
+        return keypoints_image
 
     def show(self, resize=False):
         """
