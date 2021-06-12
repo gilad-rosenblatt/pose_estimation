@@ -173,17 +173,15 @@ class KeypointsEncoder(DataEncoder):
         # Return heatmap.
         return heatmap
 
-    def decode(self, heatmap, interpolate=False):
+    def decode(self, heatmap, threshold=1e-5, interpolate=False):
         """
         Decode heatmap into keypoints in x, y, v format (v is 1 is a keypoint is detected 0 otherwise).
 
+        :param float threshold: keypoint detection threshold (minimum value in heatmap to consider it a keypoint).
         :param np.ndarray heatmap: (num_keypoints, 3) array in x, y, v format (v has a Y/N detected meaning here).
         :param bool interpolate: if True keypoints are estimated by interpolating Gaussian centers using 2 points.
         :return np.ndarray: (num_keypoints, 3) keypoints in input x, y, visible=0,1 format (0s for undetected points).
         """
-
-        # Set keypoint detection threshold.
-        threshold = 1e-5
 
         # Fill keypoints one-by-one iterating over heatmap slices.
         num_keypoints = heatmap.shape[-1]
@@ -205,7 +203,8 @@ class KeypointsEncoder(DataEncoder):
                 y, x = row, col = np.unravel_index(np.argmax(this_heatmap), this_heatmap.shape)
 
             # Filter keypoints that do not meet a minimum score threshold in the heatmap.
-            if heatmap[row, col, keypoint_num] < threshold:
+            score = heatmap[row, col, keypoint_num]
+            if score < threshold:
                 keypoints[keypoint_num, :] = np.array([0, 0, 0])  # v = 0 for not detected.
             else:
                 keypoints[keypoint_num, :] = np.array([x, y, 1])  # v = 1 for detected keypoint.

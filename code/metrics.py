@@ -51,7 +51,7 @@ class ModelEvaluator(ABC):
         annotations = cls._generate_model_annotations(coco_gt, dataset, encoder, model, **kwargs)
 
         # Save collected annotations to a json results file whose name derives from model name and hyperparameters.
-        full_filename = ModelEvaluator.get_score_full_filename(model_filename=model_filename, **kwargs)
+        full_filename = cls.get_score_full_filename(model_filename=model_filename, **kwargs)
         with open(full_filename, "w") as out_file:
             json.dump(annotations, out_file)
 
@@ -265,7 +265,7 @@ class KeypointsEvaluator(ModelEvaluator):
             # Make the prediction.
             y_pred = y_prob = model.predict(x=x)
 
-            # Decode and NMS-post-process boxes for each image and add to annotations list.
+            # Decode and post-process keypoints for each image and add to annotations list.
             for this_pred, this_annotation in zip(y_pred, coco_gt.loadAnns(ids=annotation_ids)):
                 # Decode keypoints from output heatmap to input coordinates.
                 keypoints_input = encoder.decode(heatmap=this_pred, interpolate=interpolate)
@@ -347,10 +347,12 @@ if __name__ == "__main__":
     else:
         # this_filename = KeypointsEvaluator.generate_results_file(
         #     model_filename="my_model_tim1623386780.9279761_bsz64_epo15",
+        #     threshold = 1e-5,
         #     interpolate=True
         # )
         this_filename = KeypointsEvaluator.get_score_full_filename(
             model_filename="my_model_tim1623386780.9279761_bsz64_epo15",
+            threshold=1e-5,
             interpolate=True
         )
         stats = KeypointsEvaluator.score_results_file(this_filename)
