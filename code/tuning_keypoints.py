@@ -7,6 +7,20 @@ import numpy as np
 from metrics import KeypointsEvaluator
 
 
+def get_tuning_full_file_name(model_filename):
+    """
+    Return full filename for the grid search json filename corresponding to the input model.
+
+    :param str model_filename: filename of the model to run grid search on.
+    :return str: full file name (with path) of the json file containing grid search results for the input model name.
+    """
+    return os.path.join(
+        KeypointsEvaluator.SCORES_BASE_DIR,
+        KeypointsEvaluator._get_model_type(),
+        f"{KeypointsEvaluator._encode_string(model_filename)}_tuning.json"
+    )
+
+
 def run_grid_scan(model_filename):
     """
     Run grid search on classification threshold and non-max suppression thresholds on given model.
@@ -15,7 +29,7 @@ def run_grid_scan(model_filename):
     """
 
     # Define threshold values to gris search over.
-    thresholds = np.arange(0.05, 0.80, 0.05)
+    thresholds = 1e-5 + np.arange(0.00, 0.80, 0.05)
     interpolates = [True, False]
 
     # Make sure a scores folder exists.
@@ -42,23 +56,24 @@ def run_grid_scan(model_filename):
         ))
 
     # Save all stats to json file.
-    with open(os.path.join(KeypointsEvaluator.SCORES_BASE_DIR, "keypoints", "threshold_tuning.json"), "w") as out_file:
+    with open(get_tuning_full_file_name(model_filename=model_filename), "w") as out_file:
         json.dump(stats, out_file)
 
 
-def get_best_hypers(category="map_50"):
+def get_best_hypers(model_filename, category="map_50"):
     """
     Get best threshold values for maximizing the given category of mAP score (reads grid search results from file).
 
+    :param str model_filename: filename of the model to run grid search on.
     :param str category: score category to maximize (mAP@IoU=0.50, 0.75, or 0.50:0.95).
-    :return tuple: maximum score and its the classification and NMS threshold values.
+    :return tuple: maximum score and its corresponding hyperparameter values.
     """
 
     # Assert input category.
     assert category in ["map_50", "map_75", "map_50_to_95"]
 
     # Open model mAP stats from grid search.
-    with open(os.path.join(KeypointsEvaluator.SCORES_BASE_DIR, "keypoints", "threshold_tuning.json"), "r") as in_file:
+    with open(get_tuning_full_file_name(model_filename=model_filename), "r") as in_file:
         stats = json.load(in_file)
 
     # Collect mAP @ IoU=0.50 scores for each hyperparameter combination and sort.
@@ -72,7 +87,14 @@ def get_best_hypers(category="map_50"):
 
 
 if __name__ == "__main__":
-    run_grid_scan(model_filename="my_model_tim1623504195.0734112_bsz64_epo13")
+    filenames = dict(
+        stage_1="my_model_tim1623386780.9279761_bsz64_epo15",  # 15ep@LR0.001&100ROP.  MSE all channels. No overfit.
+        stage_2="my_model_tim1623401683.0648534_bsz64_epo40",  # 40ep@LR0.001&1000ROP. KP Y/N loss. Overfit.
+        stage_3="my_model_tim1623423664.7099812_bsz64_epo7",  # 40ep@LR0.001&1000ROP. Disk mask loss. BAD.
+        stage_4="my_model_junk_tim1623438554.4141183_bsz64_epo20",  # 20ep@LR0.001&1000ROP. KP Y/N loss. Bit overfit
+        stage_5="my_model_tim1623504195.0734112_bsz64_epo13"  # 13ep@LR0.001&1000ROP. KP Y/N loss. Best ckpt of stage 4.
+    )
+    run_grid_scan(model_filename=filenames["stage_5"])
     for category in ["map_50", "map_75", "map_50_to_95"]:
-        score, interpolate, threshold = get_best_hypers(category=category)
+        score, interpolate, threshold = get_best_hypers(model_filename=filenames["stage_5"], category=category)
         print(f"{category} score {score:.2f} for threshold = {threshold:.2f} and interpolate = {interpolate}.")
