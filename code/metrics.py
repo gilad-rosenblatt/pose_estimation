@@ -250,7 +250,7 @@ class KeypointsEvaluator(ModelEvaluator):
     """Evaluator for calculating scores on keypoints detection models trained on COCO."""
 
     @classmethod
-    def _generate_model_annotations(cls, coco_gt, dataset, encoder, model, interpolate=False):
+    def _generate_model_annotations(cls, coco_gt, dataset, encoder, model, **kwargs):
         """
         Collect and save the predicted detections of the model on the COCO validation set to a annotations list.
         """
@@ -268,7 +268,7 @@ class KeypointsEvaluator(ModelEvaluator):
             # Decode and post-process keypoints for each image and add to annotations list.
             for this_pred, this_annotation in zip(y_pred, coco_gt.loadAnns(ids=annotation_ids)):
                 # Decode keypoints from output heatmap to input coordinates.
-                keypoints_input = encoder.decode(heatmap=this_pred, interpolate=interpolate)
+                keypoints_input = encoder.decode(heatmap=this_pred, **kwargs)
 
                 # Extract the bounding box used to crop the original image in preprocessing.
                 image_data = coco_gt.loadImgs(ids=[this_annotation["image_id"]])[0]
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     else:
         # this_filename = KeypointsEvaluator.generate_results_file(
         #     model_filename="my_model_tim1623386780.9279761_bsz64_epo15",
-        #     threshold = 1e-5,
+        #     threshold=1e-5,
         #     interpolate=True
         # )
         this_filename = KeypointsEvaluator.get_score_full_filename(

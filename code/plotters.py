@@ -397,9 +397,9 @@ class KeypointsPlotter:
         cv2.destroyWindow(window_name)
 
     @staticmethod
-    def show_batch(x, y_true, y_pred, show_keypoints=True):
+    def show_batch(x, y_true, y_pred, show_keypoints=True, *args, **kwargs):
         """
-        Show side-by-side the batch ground truth and predictions image by image.
+        Show side-by-side the batch ground truth and predictions image by image. Accepts optional post-processing args.
 
         :param np.nd.array x: a (batch_size, *input_shape, 3) array of normalized (values in 0-1) images.
         :param np.nd.array y_true: (batch_size, *output_shape, num_keypoints) ground-truth heatmap-encoded keypoints.
@@ -424,8 +424,8 @@ class KeypointsPlotter:
             image_copies = [image.copy() for _ in range(3)]
 
             # Decode keypoints for predictions and ground truth and draw on the image.
-            keypoints = encoder.decode(heatmap=this_y) if show_keypoints else None
-            keypoints_pred = encoder.decode(heatmap=this_pred) if show_keypoints else None
+            keypoints = encoder.decode(heatmap=this_y, *args, **kwargs) if show_keypoints else None
+            keypoints_pred = encoder.decode(heatmap=this_pred, *args, **kwargs) if show_keypoints else None
             keypoint_indices = show_keypoints if isinstance(show_keypoints, list) else None  # Is kp indices list?
             if show_keypoints:
                 Skeleton.draw(image=image, keypoints=keypoints)

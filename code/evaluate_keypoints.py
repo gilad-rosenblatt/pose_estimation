@@ -31,7 +31,7 @@ def main():
         # stage_2="my_model_tim1623401683.0648534_bsz64_epo40",  # 40ep@LR0.001&1000ROP. KP Y/N loss. Overfit.
         # stage_3="my_model_tim1623423664.7099812_bsz64_epo7",  # 40ep@LR0.001&1000ROP. Disk mask loss. BAD.
         # stage_4="my_model_junk_tim1623438554.4141183_bsz64_epo20",  # 20ep@LR0.001&1000ROP. KP Y/N loss. Bit overfit
-        stage_5="my_model_tim1623503826.1385052_bsz64_epo13"  # 13ep@LR0.001&1000ROP. KP Y/N loss. Best ckpt of stage 4.
+        stage_5="my_model_tim1623504195.0734112_bsz64_epo13"  # 13ep@LR0.001&1000ROP. KP Y/N loss. Best ckpt of stage 4.
     )
 
     # Load models and show their predictions on the test batch (press "q" to exit).
@@ -40,7 +40,14 @@ def main():
         print(f"Loading {stage}...")
         model = tf.keras.models.load_model(os.path.join(models_dir, filename), compile=False)
         y_prob = model.predict(x=x)
-        KeypointsPlotter.show_batch(x=x, y_true=y_true, y_pred=y_prob, show_keypoints=True)
+        KeypointsPlotter.show_batch(
+            x=x,
+            y_true=y_true,
+            y_pred=y_prob,
+            show_keypoints=True,
+            interpolate=True,
+            threshold=0.5
+        )
 
 
 if __name__ == "__main__":
