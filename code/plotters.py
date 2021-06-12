@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 
 import cv2
 import matplotlib.pyplot as plt
@@ -417,7 +418,7 @@ class KeypointsPlotter:
         # Show ground-truth and predictions for each image in sequence.
         window_name1 = "keypoints"
         window_name2 = "heatmaps"
-        for this_x, this_y, this_pred in zip(x, y_true, y_pred):
+        for index, (this_x, this_y, this_pred) in enumerate(zip(x, y_true, y_pred)):
 
             # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
@@ -451,8 +452,18 @@ class KeypointsPlotter:
             cv2.imshow(window_name1, np.hstack((image, image_copies[0])))
             cv2.imshow(window_name2, np.hstack((image_copies[1], image_copies[2])))
 
-            # Break the loop if key 'q' was pressed.
-            if cv2.waitKey() & 0xFF == ord("q"):
+            # Break the loop if key 'q' was pressed or save if 's' was pressed.
+            keypress = cv2.waitKey() & 0xFF
+            if keypress & 0xFF == ord("s"):
+                filenames = [
+                    os.path.join("..", "images", "keypoints", "validation", f"heatmaps_{index}.jpg"),
+                    os.path.join("..", "images", "keypoints", "validation", f"kps_cmpr_{index}.jpg")
+                ]
+                cv2.imwrite(filenames[0], np.hstack((image, image_copies[0])))
+                cv2.imwrite(filenames[1], np.hstack((image_copies[1], image_copies[2])))
+                for filename in filenames:
+                    print(f"Saved {filename}.")
+            if keypress & 0xFF == ord("q"):
                 break
 
         # Close the window.
@@ -461,7 +472,52 @@ class KeypointsPlotter:
 
     @staticmethod
     def show_annotations(annotations):
-        raise NotImplemented
+        """
+        Show the images corresponding to the input annotations along with their keypoints image by image.
+
+        :param list annotations: list of similarly formatted dictionaries each is an annotation in COCO format.
+        """
+
+        # Load the COCO annotations associated with json results file.
+        coco_gt = COCO(annotation_file=KeypointsParser.get_annotation_file(dataset="validation"))
+        path_to_data = os.path.join(KeypointsParser.PARENT_DIR, KeypointsParser.get_data_dir(dataset="validation"))
+
+        # build a dictionary of annotation by image ID.
+        keypoints_dict = defaultdict(list)
+        for annotation in annotations:
+            keypoints_dict[annotation["image_id"]].append(annotation["keypoints"])
+
+        # Show each annotation drawn on it corresponding image in sequence.
+        window_name = "keypoints"
+        for image_id, keypoints_sets in keypoints_dict.items():
+
+            # Skip images without keypoints.
+            if not keypoints_sets:
+                continue
+
+            # Load the image corresponding to this annotation.
+            image_dict = coco_gt.loadImgs(ids=image_id)[0]
+            this_image = cv2.imread(os.path.join(path_to_data, image_dict["file_name"]))
+
+            # Get the bounding box from the annotation.
+            for these_keypoints in keypoints_sets:
+                these_keypoints = np.array(these_keypoints, dtype=np.float32).reshape(-1, 3)
+                Skeleton.draw(image=this_image, keypoints=these_keypoints)
+
+            # Show the image with drawn bounding box.
+            cv2.imshow(window_name, this_image)
+
+            # Break the loop if key 'q' was pressed or save if 's' was pressed.
+            keypress = cv2.waitKey() & 0xFF
+            if keypress & 0xFF == ord("s"):
+                filename = os.path.join("..", "images", "keypoints", "validation", f"kps_{image_dict['file_name']}")
+                cv2.imwrite(filename, this_image)
+                print(f"Saved {filename}.")
+            if keypress & 0xFF == ord("q"):
+                break
+
+        # Close the window.
+        cv2.destroyWindow(window_name)
 
 
 if __name__ == "__main__":

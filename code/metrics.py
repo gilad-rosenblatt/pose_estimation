@@ -351,9 +351,9 @@ if __name__ == "__main__":
         #     interpolate=True
         # )
         this_filename = KeypointsEvaluator.get_score_full_filename(
-            model_filename="my_model_tim1623386780.9279761_bsz64_epo15",
-            threshold=1e-5,
-            interpolate=True
+            model_filename="my_model_tim1623504195.0734112_bsz64_epo13",
+            interpolate=True,
+            threshold=0.1
         )
-        stats = KeypointsEvaluator.score_results_file(this_filename)
-        # KeypointsEvaluator.show(this_filename)  # TODO show_annotations not yet implemented.
+        # stats = KeypointsEvaluator.score_results_file(this_filename)
+        KeypointsEvaluator.show(this_filename)  # TODO show_annotations not yet implemented.
