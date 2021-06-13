@@ -1,6 +1,6 @@
-# Object Detection
+# Pose Estimation
 
-This is the object detection exercise for FL8 week 6 by Gilad Rosenblatt.
+Pose estimation from scratch by Gilad Rosenblatt.
 
 
 ## License
