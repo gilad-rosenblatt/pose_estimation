@@ -313,7 +313,7 @@ class KeypointsDataset(ImageDataGenerator):
         keypoints_moved = KeypointsEncoder.scale_keypoints(
             keypoints=keypoints,
             from_shape=cls.INPUT_SHAPE,
-            to_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1)),  # Crop box shape (integer pixel numbers).
+            to_shape=(int(y1 + h) - int(y1), int(x1 + w) - int(x1))  # Crop box shape (integer pixel numbers).
         )
 
         # Move keypoints back to coordinates of original image.

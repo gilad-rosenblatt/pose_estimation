@@ -200,9 +200,10 @@ class Skeleton:
         return lines[:index], colors  # Return only valid indices.
 
     @staticmethod
-    def draw(image, keypoints, box=None, alpha=0.9):
+    def draw(image, keypoints, box=None, alpha=0.9, **kwargs):
         """
         Make skeleton lines out of an input keypoints array for a single person over a given image. Optionally add box.
+        Optional arguments are passed on to the draw_lines method (e.g., for line thickness or point radius).
 
         :param np.ndarray image: image to draw on (assumed uint8 BGR image).
         :param np.ndarray keypoints: (num_keypoints=17, 3) array for x, y, visible_flag for each of a persons keypoints.
@@ -214,7 +215,7 @@ class Skeleton:
             Drawer.draw_boxes(image=image, boxes=box[np.newaxis, :], colors=[yellow])
         overlay = image.copy()
         lines, colors = Skeleton._make_lines(keypoints=keypoints)
-        Drawer.draw_lines(image=overlay, lines=lines, colors=colors, mark_endpoints=True)
+        Drawer.draw_lines(image=overlay, lines=lines, colors=colors, mark_endpoints=True, **kwargs)
         cv2.addWeighted(src1=overlay, alpha=alpha, src2=image, beta=1 - alpha, gamma=0, dst=image)
 
     @staticmethod
