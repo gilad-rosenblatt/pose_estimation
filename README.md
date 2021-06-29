@@ -2,11 +2,13 @@
 
 Pose estimation from scratch by Gilad Rosenblatt.
 
-![approch2](/assets/skater.gif?raw=true)
+![demo](/assets/skater.gif?raw=true)
+
+![pics](/assets/mosaic.png?raw=true)
 
 ## Architecture
 
-![approch2](/assets/design.png?raw=true)
+![chart](/assets/design.png?raw=true)
 
 ## License
 
