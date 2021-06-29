@@ -94,7 +94,7 @@ if __name__ == "__main__":
         stage_4="my_model_junk_tim1623438554.4141183_bsz64_epo20",  # 20ep@LR0.001&1000ROP. KP Y/N loss. Bit overfit.
         stage_5="my_model_tim1623504195.0734112_bsz64_epo13"  # 13ep@LR0.001&1000ROP. KP Y/N loss. Best ckpt of stage 4.
     )
-    run_grid_scan(model_filename=filenames["stage_5"])
+    # run_grid_scan(model_filename=filenames["stage_5"])
     for category in ["map_50", "map_75", "map_50_to_95"]:
         score, interpolate, threshold = get_best_hypers(model_filename=filenames["stage_5"], category=category)
         print(f"{category} score {score:.2f} for threshold = {threshold:.2f} and interpolate = {interpolate}.")

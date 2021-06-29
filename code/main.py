@@ -23,7 +23,7 @@ def video_test(filename, show=False):
     # Collect the (first-only) video filename in the test folder.
     test_dir = os.path.join("..", "data", "my_test", "keypoints", "videos")
     filenames = [f for f in os.listdir(test_dir)]
-    print(f"Available files video in test folder: {' '.join(filenames)}.")
+    print(f"Available video files in test folder: {' '.join(filenames)}.")
     assert filename in filenames
     this_filename = filename
 

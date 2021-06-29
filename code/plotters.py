@@ -301,7 +301,7 @@ class DetectionsPlotter:
 
         # Show ground-truth and predictions for each image in sequence.
         window_name = "annotation_boxes"
-        for this_x, this_y, this_pred in zip(x, y_true, y_pred):
+        for index, (this_x, this_y, this_pred) in enumerate(zip(x, y_true, y_pred)):
 
             # Cast image to uint8.
             image = (this_x * 255).astype(np.uint8)
@@ -329,8 +329,13 @@ class DetectionsPlotter:
             # Show the image with drawn bounding boxes and circles.
             cv2.imshow(window_name, image)
 
-            # Break the loop if key 'q' was pressed.
-            if cv2.waitKey() & 0xFF == ord("q"):
+            # Break the loop if key 'q' was pressed or save if 's' was pressed.
+            keypress = cv2.waitKey() & 0xFF
+            if keypress & 0xFF == ord("s"):
+                filename = os.path.join("..", "images", "detection", "validation", f"boxes_{index}.jpg")
+                cv2.imwrite(filename, image)
+                print(f"Saved {filename}.")
+            if keypress & 0xFF == ord("q"):
                 break
 
         # Close the window.
